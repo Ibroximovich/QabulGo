@@ -6,6 +6,15 @@ definitions:
         example: Tibbiy litsenziya ma'lumotlari kiritilmagan
         type: string
     type: object
+  dto.AvailabilitySlotDTO:
+    properties:
+      end_time:
+        example: "10:00"
+        type: string
+      start_time:
+        example: "09:00"
+        type: string
+    type: object
   dto.ClinicDetailDTO:
     properties:
       address:
@@ -216,6 +225,32 @@ definitions:
     - phone
     - region
     type: object
+  dto.CreateDateOverrideRequest:
+    properties:
+      date:
+        description: YYYY-MM-DD
+        example: "2026-11-05"
+        type: string
+      end_time:
+        example: "11:00"
+        type: string
+      reason:
+        example: Ta'til
+        type: string
+      start_time:
+        example: "10:00"
+        type: string
+      status:
+        enum:
+        - closed
+        - available
+        - day_off
+        example: closed
+        type: string
+    required:
+    - date
+    - status
+    type: object
   dto.CreateDoctorRequest:
     properties:
       appointment_duration_minutes:
@@ -288,6 +323,59 @@ definitions:
       specialty:
         $ref: '#/definitions/dto.SpecialtyDTO'
     type: object
+  dto.DoctorDateOverrideDTO:
+    properties:
+      clinic_doctor_id:
+        type: string
+      created_at:
+        type: string
+      date:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      reason:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.DoctorWeeklyScheduleDTO:
+    properties:
+      clinic_doctor_id:
+        type: string
+      clinic_id:
+        type: string
+      doctor_id:
+        type: string
+      slots:
+        items:
+          $ref: '#/definitions/dto.DoctorWeeklySlotDTO'
+        type: array
+    type: object
+  dto.DoctorWeeklySlotDTO:
+    properties:
+      clinic_doctor_id:
+        type: string
+      created_at:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      weekday:
+        type: integer
+    type: object
   dto.ErrorResponse:
     properties:
       errors:
@@ -308,6 +396,32 @@ definitions:
         type: string
     required:
     - email
+    type: object
+  dto.GenerateScheduleRequest:
+    type: object
+  dto.GenerateScheduleResponse:
+    properties:
+      slots:
+        items:
+          $ref: '#/definitions/dto.GeneratedSlotItem'
+        type: array
+      total_slots:
+        type: integer
+    type: object
+  dto.GeneratedSlotItem:
+    properties:
+      end_time:
+        example: "10:00"
+        type: string
+      start_time:
+        example: "09:00"
+        type: string
+      status:
+        example: active
+        type: string
+      weekday:
+        example: 1
+        type: integer
     type: object
   dto.LoginData:
     properties:
@@ -455,6 +569,25 @@ definitions:
     - last_name
     - password
     - phone
+    type: object
+  dto.PublicAvailabilityResponse:
+    properties:
+      clinic_doctor_id:
+        type: string
+      clinic_id:
+        type: string
+      date:
+        example: "2026-11-05"
+        type: string
+      doctor_id:
+        type: string
+      slots:
+        items:
+          $ref: '#/definitions/dto.AvailabilitySlotDTO'
+        type: array
+      timezone:
+        example: Asia/Tashkent
+        type: string
     type: object
   dto.PublicClinicItemDTO:
     properties:
@@ -604,6 +737,15 @@ definitions:
     - email
     - new_password
     type: object
+  dto.SaveWeeklyScheduleRequest:
+    properties:
+      slots:
+        items:
+          $ref: '#/definitions/dto.WeeklySlotItemRequest'
+        type: array
+    required:
+    - slots
+    type: object
   dto.SpecialtyDTO:
     properties:
       icon_url:
@@ -674,6 +816,28 @@ definitions:
         items:
           $ref: '#/definitions/dto.WorkingHourItem'
         type: array
+    type: object
+  dto.UpdateDateOverrideRequest:
+    properties:
+      date:
+        example: "2026-11-05"
+        type: string
+      end_time:
+        example: "12:00"
+        type: string
+      reason:
+        example: Shaxsiy sabab
+        type: string
+      start_time:
+        example: "11:00"
+        type: string
+      status:
+        enum:
+        - closed
+        - available
+        - day_off
+        example: closed
+        type: string
     type: object
   dto.UpdateDoctorRequest:
     properties:
@@ -761,6 +925,27 @@ definitions:
     required:
     - code
     - email
+    type: object
+  dto.WeeklySlotItemRequest:
+    properties:
+      end_time:
+        example: "10:00"
+        type: string
+      start_time:
+        example: "09:00"
+        type: string
+      status:
+        example: active
+        type: string
+      weekday:
+        example: 1
+        maximum: 7
+        minimum: 1
+        type: integer
+    required:
+    - end_time
+    - start_time
+    - weekday
     type: object
   dto.WorkingHourItem:
     properties:
@@ -1574,6 +1759,295 @@ paths:
       summary: Shifokor ma’lumotlarini tahrirlash
       tags:
       - Doctor Management
+  /api/v1/clinics/{id}/doctors/{doctorId}/schedule:
+    get:
+      description: Haftaning har bir kuni uchun saqlangan qabul vaqtlari
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Haftalik jadval
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.DoctorWeeklyScheduleDTO'
+              type: object
+        "404":
+          description: Shifokor topilmadi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Shifokorning haftalik jadvalini olish
+      tags:
+      - Doctor Schedule
+    put:
+      consumes:
+      - application/json
+      description: Avtomatik yoki qo‘lda kiritilgan slotlarni atomik tarzda saqlaydi
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Haftalik slotlar ro‘yxati
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SaveWeeklyScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Jadval muvaffaqiyatli saqlandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.DoctorWeeklyScheduleDTO'
+              type: object
+        "400":
+          description: To‘qnashuv yoki validatsiya xatoligi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Ruxsat berilmagan
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Shifokorning haftalik jadvalini saqlash yoki yangilash
+      tags:
+      - Doctor Schedule
+  /api/v1/clinics/{id}/doctors/{doctorId}/schedule/exceptions:
+    get:
+      description: Dam olish kunlari, yopilgan slotlar yoki qo‘shilgan maxsus vaqtlar
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Aniq sana (YYYY-MM-DD)
+        in: query
+        name: date
+        type: string
+      - description: Oraliq boshi (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Oraliq oxiri (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Istisnolar ro‘yxati
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.DoctorDateOverrideDTO'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Shifokorning istisno sanalari va override'larini olish
+      tags:
+      - Doctor Schedule
+    post:
+      consumes:
+      - application/json
+      description: Butun kunni yopish (day_off), bitta vaqtni yopish (closed) yoki
+        yangi vaqt qo‘shish (available)
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Istisno ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateDateOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Istisno yaratildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.DoctorDateOverrideDTO'
+              type: object
+        "400":
+          description: Validatsiya xatoligi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Jadvalga yangi istisno sana yoki maxsus slot qo‘shish
+      tags:
+      - Doctor Schedule
+  /api/v1/clinics/{id}/doctors/{doctorId}/schedule/exceptions/{exceptionId}:
+    delete:
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Istisno UUID
+        in: path
+        name: exceptionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Istisno o‘chirildi
+          schema:
+            $ref: '#/definitions/dto.SuccessResponse'
+      security:
+      - BearerAuth: []
+      summary: Mavjud istisno sanani o‘chirish
+      tags:
+      - Doctor Schedule
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Istisno UUID
+        in: path
+        name: exceptionId
+        required: true
+        type: string
+      - description: O‘zgartirishlar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateDateOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Istisno yangilandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.DoctorDateOverrideDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Mavjud istisno sanani tahrirlash
+      tags:
+      - Doctor Schedule
+  /api/v1/clinics/{id}/doctors/{doctorId}/schedule/generate:
+    post:
+      consumes:
+      - application/json
+      description: Parametrlar asosida slotlar ro‘yxatini hisoblaydi, lekin bazaga
+        saqlamaydi
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Parametrlar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.GenerateScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Hisoblangan slotlar
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.GenerateScheduleResponse'
+              type: object
+        "400":
+          description: Noto‘g‘ri ma’lumotlar
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Ruxsat berilmagan
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Shifokor qabul vaqtlarini avtomatik hisoblash (Preview)
+      tags:
+      - Doctor Schedule
   /api/v1/clinics/{id}/submit:
     post:
       description: 'Klinika ma’lumotlari to‘liq kiritilgach, superadmin tekshiruvi
@@ -1762,6 +2236,50 @@ paths:
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       summary: Bemorlar uchun tasdiqlangan klinikalarni qidirish va filtrlash
+      tags:
+      - Public Search
+  /api/v1/public/clinics/{clinicId}/doctors/{doctorId}/availability:
+    get:
+      description: Faqat tasdiqlangan klinika va faol shifokor uchun, o‘tib ketgan
+        vaqtlar chiqarilmaydi
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: clinicId
+        required: true
+        type: string
+      - description: Shifokor yoki ClinicDoctor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Sana (YYYY-MM-DD)
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ochiq qabul vaqtlari
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.PublicAvailabilityResponse'
+              type: object
+        "400":
+          description: Noto‘g‘ri sana formati
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Topilmadi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Bemorlar uchun shifokorning ma’lum sanadagi ochiq qabul vaqtlarini
+        olish
       tags:
       - Public Search
   /api/v1/public/clinics/{id}:

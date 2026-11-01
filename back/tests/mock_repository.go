@@ -1155,3 +1155,253 @@ func (m *MockPublicSearchRepository) GetRegionsCatalog(ctx context.Context) ([]d
 	})
 	return res, nil
 }
+
+// MockScheduleRepository
+type MockScheduleRepository struct {
+	mu            sync.RWMutex
+	clinicRepo    *MockClinicRepository
+	doctorRepo    *MockDoctorRepository
+	weeklySlots   map[uuid.UUID][]models.DoctorWeeklySlot // keyed by clinicDoctorID
+	dateOverrides map[uuid.UUID]models.DoctorDateSlotOverride // keyed by overrideID
+}
+
+func NewMockScheduleRepository(clinicRepo *MockClinicRepository, doctorRepo *MockDoctorRepository) *MockScheduleRepository {
+	return &MockScheduleRepository{
+		clinicRepo:    clinicRepo,
+		doctorRepo:    doctorRepo,
+		weeklySlots:   make(map[uuid.UUID][]models.DoctorWeeklySlot),
+		dateOverrides: make(map[uuid.UUID]models.DoctorDateSlotOverride),
+	}
+}
+
+func (m *MockScheduleRepository) FindClinicDoctor(ctx context.Context, clinicID, doctorIDOrCDID uuid.UUID) (*models.ClinicDoctor, error) {
+	m.doctorRepo.mu.RLock()
+	defer m.doctorRepo.mu.RUnlock()
+
+	// 1. By ID
+	if cd, ok := m.doctorRepo.clinicDoctors[doctorIDOrCDID]; ok {
+		if cd.ClinicID == clinicID && !cd.DeletedAt.Valid {
+			cdCopy := *cd
+			if doc, docOk := m.doctorRepo.doctors[cd.DoctorID]; docOk {
+				docCopy := *doc
+				cdCopy.Doctor = &docCopy
+			}
+			return &cdCopy, nil
+		}
+	}
+
+	// 2. By DoctorID
+	for _, cd := range m.doctorRepo.clinicDoctors {
+		if cd.ClinicID == clinicID && cd.DoctorID == doctorIDOrCDID && !cd.DeletedAt.Valid {
+			cdCopy := *cd
+			if doc, docOk := m.doctorRepo.doctors[cd.DoctorID]; docOk {
+				docCopy := *doc
+				cdCopy.Doctor = &docCopy
+			}
+			return &cdCopy, nil
+		}
+	}
+
+	return nil, repositories.ErrClinicDoctorNotFound
+}
+
+func (m *MockScheduleRepository) GetWeeklySlots(ctx context.Context, clinicDoctorID uuid.UUID) ([]models.DoctorWeeklySlot, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	slots := m.weeklySlots[clinicDoctorID]
+	var res []models.DoctorWeeklySlot
+	for _, s := range slots {
+		res = append(res, s)
+	}
+	sort.Slice(res, func(i, j int) bool {
+		if res[i].Weekday != res[j].Weekday {
+			return res[i].Weekday < res[j].Weekday
+		}
+		return res[i].StartTime < res[j].StartTime
+	})
+	return res, nil
+}
+
+func (m *MockScheduleRepository) ReplaceWeeklySlots(ctx context.Context, clinicDoctorID uuid.UUID, slots []models.DoctorWeeklySlot) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for i := range slots {
+		if slots[i].ID == uuid.Nil {
+			slots[i].ID = uuid.New()
+		}
+		slots[i].ClinicDoctorID = clinicDoctorID
+		slots[i].CreatedAt = time.Now()
+		slots[i].UpdatedAt = time.Now()
+	}
+	m.weeklySlots[clinicDoctorID] = slots
+	return nil
+}
+
+func (m *MockScheduleRepository) CheckDoctorCrossClinicConflict(
+	ctx context.Context,
+	doctorID, currentClinicDoctorID uuid.UUID,
+	weekday int,
+	startTime, endTime string,
+) (*models.DoctorWeeklySlot, *models.Clinic, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.doctorRepo.mu.RLock()
+	var otherCDIDs []uuid.UUID
+	clinicByCDID := make(map[uuid.UUID]*models.Clinic)
+	for cdID, cd := range m.doctorRepo.clinicDoctors {
+		if cd.DoctorID == doctorID && cd.ID != currentClinicDoctorID && !cd.DeletedAt.Valid {
+			otherCDIDs = append(otherCDIDs, cdID)
+			m.clinicRepo.mu.RLock()
+			if c, ok := m.clinicRepo.clinics[cd.ClinicID]; ok {
+				cCopy := *c
+				clinicByCDID[cdID] = &cCopy
+			}
+			m.clinicRepo.mu.RUnlock()
+		}
+	}
+	m.doctorRepo.mu.RUnlock()
+
+	for _, cdID := range otherCDIDs {
+		for _, slot := range m.weeklySlots[cdID] {
+			if slot.Weekday == weekday && slot.Status == models.SlotStatusActive {
+				// overlap: slot.StartTime < endTime && slot.EndTime > startTime
+				if slot.StartTime < endTime && slot.EndTime > startTime {
+					slotCopy := slot
+					return &slotCopy, clinicByCDID[cdID], repositories.ErrCrossClinicConflict
+				}
+			}
+		}
+	}
+
+	return nil, nil, nil
+}
+
+func (m *MockScheduleRepository) GetDateOverrides(ctx context.Context, clinicDoctorID uuid.UUID, date string, startDate, endDate string) ([]models.DoctorDateSlotOverride, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var res []models.DoctorDateSlotOverride
+	for _, ov := range m.dateOverrides {
+		if ov.ClinicDoctorID == clinicDoctorID {
+			if date != "" && ov.Date != date {
+				continue
+			}
+			if startDate != "" && ov.Date < startDate {
+				continue
+			}
+			if endDate != "" && ov.Date > endDate {
+				continue
+			}
+			res = append(res, ov)
+		}
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		if res[i].Date != res[j].Date {
+			return res[i].Date < res[j].Date
+		}
+		stI := ""
+		if res[i].StartTime != nil {
+			stI = *res[i].StartTime
+		}
+		stJ := ""
+		if res[j].StartTime != nil {
+			stJ = *res[j].StartTime
+		}
+		return stI < stJ
+	})
+
+	return res, nil
+}
+
+func (m *MockScheduleRepository) GetDateOverrideByID(ctx context.Context, overrideID uuid.UUID) (*models.DoctorDateSlotOverride, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	ov, ok := m.dateOverrides[overrideID]
+	if !ok {
+		return nil, repositories.ErrDateOverrideNotFound
+	}
+	return &ov, nil
+}
+
+func (m *MockScheduleRepository) CreateDateOverride(ctx context.Context, override *models.DoctorDateSlotOverride) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if override.ID == uuid.Nil {
+		override.ID = uuid.New()
+	}
+	override.CreatedAt = time.Now()
+	override.UpdatedAt = time.Now()
+	m.dateOverrides[override.ID] = *override
+	return nil
+}
+
+func (m *MockScheduleRepository) UpdateDateOverride(ctx context.Context, override *models.DoctorDateSlotOverride) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.dateOverrides[override.ID]; !ok {
+		return repositories.ErrDateOverrideNotFound
+	}
+	override.UpdatedAt = time.Now()
+	m.dateOverrides[override.ID] = *override
+	return nil
+}
+
+func (m *MockScheduleRepository) DeleteDateOverride(ctx context.Context, overrideID uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.dateOverrides[overrideID]; !ok {
+		return repositories.ErrDateOverrideNotFound
+	}
+	delete(m.dateOverrides, overrideID)
+	return nil
+}
+
+func (m *MockScheduleRepository) GetAvailabilityData(
+	ctx context.Context,
+	clinicID, doctorIDOrCDID uuid.UUID,
+	dateStr string,
+	weekday int,
+) (*models.Clinic, *models.ClinicDoctor, []models.DoctorWeeklySlot, []models.DoctorDateSlotOverride, error) {
+	m.clinicRepo.mu.RLock()
+	clinic, cExists := m.clinicRepo.clinics[clinicID]
+	var clinicCopy models.Clinic
+	if cExists {
+		clinicCopy = *clinic
+	}
+	m.clinicRepo.mu.RUnlock()
+	if !cExists {
+		return nil, nil, nil, nil, repositories.ErrClinicNotFound
+	}
+
+	cd, err := m.FindClinicDoctor(ctx, clinicID, doctorIDOrCDID)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	slots, err := m.GetWeeklySlots(ctx, cd.ID)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	var weekdaySlots []models.DoctorWeeklySlot
+	for _, s := range slots {
+		if s.Weekday == weekday {
+			weekdaySlots = append(weekdaySlots, s)
+		}
+	}
+
+	overrides, err := m.GetDateOverrides(ctx, cd.ID, dateStr, "", "")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return &clinicCopy, cd, weekdaySlots, overrides, nil
+}
+

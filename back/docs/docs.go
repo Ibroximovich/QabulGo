@@ -1325,6 +1325,476 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/clinics/{id}/doctors/{doctorId}/schedule": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Haftaning har bir kuni uchun saqlangan qabul vaqtlari",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Doctor Schedule"
+                ],
+                "summary": "Shifokorning haftalik jadvalini olish",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Haftalik jadval",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.DoctorWeeklyScheduleDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Shifokor topilmadi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Avtomatik yoki qo‘lda kiritilgan slotlarni atomik tarzda saqlaydi",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Doctor Schedule"
+                ],
+                "summary": "Shifokorning haftalik jadvalini saqlash yoki yangilash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Haftalik slotlar ro‘yxati",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.SaveWeeklyScheduleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Jadval muvaffaqiyatli saqlandi",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.DoctorWeeklyScheduleDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "To‘qnashuv yoki validatsiya xatoligi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Ruxsat berilmagan",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinics/{id}/doctors/{doctorId}/schedule/exceptions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Dam olish kunlari, yopilgan slotlar yoki qo‘shilgan maxsus vaqtlar",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Doctor Schedule"
+                ],
+                "summary": "Shifokorning istisno sanalari va override'larini olish",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Aniq sana (YYYY-MM-DD)",
+                        "name": "date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Oraliq boshi (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Oraliq oxiri (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Istisnolar ro‘yxati",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.DoctorDateOverrideDTO"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Butun kunni yopish (day_off), bitta vaqtni yopish (closed) yoki yangi vaqt qo‘shish (available)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Doctor Schedule"
+                ],
+                "summary": "Jadvalga yangi istisno sana yoki maxsus slot qo‘shish",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Istisno ma’lumotlari",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateDateOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Istisno yaratildi",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.DoctorDateOverrideDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Validatsiya xatoligi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinics/{id}/doctors/{doctorId}/schedule/exceptions/{exceptionId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Doctor Schedule"
+                ],
+                "summary": "Mavjud istisno sanani o‘chirish",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Istisno UUID",
+                        "name": "exceptionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Istisno o‘chirildi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SuccessResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Doctor Schedule"
+                ],
+                "summary": "Mavjud istisno sanani tahrirlash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Istisno UUID",
+                        "name": "exceptionId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "O‘zgartirishlar",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateDateOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Istisno yangilandi",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.DoctorDateOverrideDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinics/{id}/doctors/{doctorId}/schedule/generate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Parametrlar asosida slotlar ro‘yxatini hisoblaydi, lekin bazaga saqlamaydi",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Doctor Schedule"
+                ],
+                "summary": "Shifokor qabul vaqtlarini avtomatik hisoblash (Preview)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Parametrlar",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.GenerateScheduleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Hisoblangan slotlar",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.GenerateScheduleResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Noto‘g‘ri ma’lumotlar",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Ruxsat berilmagan",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/clinics/{id}/submit": {
             "post": {
                 "security": [
@@ -1670,6 +2140,73 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Server xatosi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/clinics/{clinicId}/doctors/{doctorId}/availability": {
+            "get": {
+                "description": "Faqat tasdiqlangan klinika va faol shifokor uchun, o‘tib ketgan vaqtlar chiqarilmaydi",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Bemorlar uchun shifokorning ma’lum sanadagi ochiq qabul vaqtlarini olish",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Shifokor yoki ClinicDoctor UUID",
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sana (YYYY-MM-DD)",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ochiq qabul vaqtlari",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.PublicAvailabilityResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Noto‘g‘ri sana formati",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Topilmadi",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -2104,6 +2641,19 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AvailabilitySlotDTO": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "type": "string",
+                    "example": "10:00"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "09:00"
+                }
+            }
+        },
         "dto.ClinicDetailDTO": {
             "type": "object",
             "properties": {
@@ -2406,6 +2956,41 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreateDateOverrideRequest": {
+            "type": "object",
+            "required": [
+                "date",
+                "status"
+            ],
+            "properties": {
+                "date": {
+                    "description": "YYYY-MM-DD",
+                    "type": "string",
+                    "example": "2026-11-05"
+                },
+                "end_time": {
+                    "type": "string",
+                    "example": "11:00"
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "Ta'til"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "10:00"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "closed",
+                        "available",
+                        "day_off"
+                    ],
+                    "example": "closed"
+                }
+            }
+        },
         "dto.CreateDoctorRequest": {
             "type": "object",
             "required": [
@@ -2506,6 +3091,87 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.DoctorDateOverrideDTO": {
+            "type": "object",
+            "properties": {
+                "clinic_doctor_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.DoctorWeeklyScheduleDTO": {
+            "type": "object",
+            "properties": {
+                "clinic_doctor_id": {
+                    "type": "string"
+                },
+                "clinic_id": {
+                    "type": "string"
+                },
+                "doctor_id": {
+                    "type": "string"
+                },
+                "slots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.DoctorWeeklySlotDTO"
+                    }
+                }
+            }
+        },
+        "dto.DoctorWeeklySlotDTO": {
+            "type": "object",
+            "properties": {
+                "clinic_doctor_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "weekday": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -2534,6 +3200,44 @@ const docTemplate = `{
                 "email": {
                     "type": "string",
                     "example": "ali@example.com"
+                }
+            }
+        },
+        "dto.GenerateScheduleRequest": {
+            "type": "object"
+        },
+        "dto.GenerateScheduleResponse": {
+            "type": "object",
+            "properties": {
+                "slots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.GeneratedSlotItem"
+                    }
+                },
+                "total_slots": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.GeneratedSlotItem": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "type": "string",
+                    "example": "10:00"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "09:00"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "weekday": {
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },
@@ -2740,6 +3444,34 @@ const docTemplate = `{
                 "phone": {
                     "type": "string",
                     "example": "+998901234567"
+                }
+            }
+        },
+        "dto.PublicAvailabilityResponse": {
+            "type": "object",
+            "properties": {
+                "clinic_doctor_id": {
+                    "type": "string"
+                },
+                "clinic_id": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string",
+                    "example": "2026-11-05"
+                },
+                "doctor_id": {
+                    "type": "string"
+                },
+                "slots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AvailabilitySlotDTO"
+                    }
+                },
+                "timezone": {
+                    "type": "string",
+                    "example": "Asia/Tashkent"
                 }
             }
         },
@@ -2964,6 +3696,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.SaveWeeklyScheduleRequest": {
+            "type": "object",
+            "required": [
+                "slots"
+            ],
+            "properties": {
+                "slots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WeeklySlotItemRequest"
+                    }
+                }
+            }
+        },
         "dto.SpecialtyDTO": {
             "type": "object",
             "properties": {
@@ -3063,6 +3809,36 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/dto.WorkingHourItem"
                     }
+                }
+            }
+        },
+        "dto.UpdateDateOverrideRequest": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2026-11-05"
+                },
+                "end_time": {
+                    "type": "string",
+                    "example": "12:00"
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "Shaxsiy sabab"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "11:00"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "closed",
+                        "available",
+                        "day_off"
+                    ],
+                    "example": "closed"
                 }
             }
         },
@@ -3186,6 +3962,34 @@ const docTemplate = `{
                 "email": {
                     "type": "string",
                     "example": "ali@example.com"
+                }
+            }
+        },
+        "dto.WeeklySlotItemRequest": {
+            "type": "object",
+            "required": [
+                "end_time",
+                "start_time",
+                "weekday"
+            ],
+            "properties": {
+                "end_time": {
+                    "type": "string",
+                    "example": "10:00"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "09:00"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "weekday": {
+                    "type": "integer",
+                    "maximum": 7,
+                    "minimum": 1,
+                    "example": 1
                 }
             }
         },

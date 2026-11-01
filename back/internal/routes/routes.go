@@ -23,6 +23,7 @@ type RouterConfig struct {
 	SpecialtyHandler    *handlers.SpecialtyHandler
 	UploadHandler       *handlers.UploadHandler
 	PublicSearchHandler *handlers.PublicSearchHandler
+	ScheduleHandler     *handlers.ScheduleHandler
 }
 
 // SetupRouter initializes and configures the Gin engine with all routes and middlewares
@@ -145,7 +146,23 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 			}
 		}
 
-		// 7. Superadmin Routes
+		// 7. Doctor Schedule Routes
+		if rc.ScheduleHandler != nil {
+			schedule := v1.Group("/clinics/:id/doctors/:doctorId/schedule")
+			schedule.Use(middleware.Auth(rc.Config))
+			schedule.Use(middleware.RequireRole(models.RoleClinicOwner, models.RoleClinicAdmin, models.RoleSuperAdmin))
+			{
+				schedule.GET("", rc.ScheduleHandler.GetWeeklySchedule)
+				schedule.PUT("", rc.ScheduleHandler.SaveWeeklySchedule)
+				schedule.POST("/generate", rc.ScheduleHandler.GenerateSchedulePreview)
+				schedule.GET("/exceptions", rc.ScheduleHandler.GetExceptions)
+				schedule.POST("/exceptions", rc.ScheduleHandler.CreateException)
+				schedule.PATCH("/exceptions/:exceptionId", rc.ScheduleHandler.UpdateException)
+				schedule.DELETE("/exceptions/:exceptionId", rc.ScheduleHandler.DeleteException)
+			}
+		}
+
+		// 8. Superadmin Routes
 		if rc.AdminHandler != nil {
 			admin := v1.Group("/admin")
 			admin.Use(middleware.Auth(rc.Config))
@@ -173,6 +190,11 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 				// Doctors
 				public.GET("/doctors", rc.PublicSearchHandler.SearchDoctors)
 				public.GET("/doctors/:id", rc.PublicSearchHandler.GetDoctorDetails)
+
+				// Doctor Availability (Qabul vaqtlari)
+				if rc.ScheduleHandler != nil {
+					public.GET("/clinics/:id/doctors/:doctorId/availability", rc.ScheduleHandler.GetPublicAvailability)
+				}
 
 				// Regions catalog
 				public.GET("/regions", rc.PublicSearchHandler.GetRegionsCatalog)

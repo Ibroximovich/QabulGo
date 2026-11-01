@@ -165,3 +165,6 @@ export interface AdminClinicDetailsResponse {
   reviews: VerificationReview[];
 }
 
+export * from './schedule';
+
+

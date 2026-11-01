@@ -13,6 +13,7 @@ import {
   RegionItem,
   SpecialtyItem,
   SearchListResponse,
+  PublicAvailabilityResponse,
 } from '../types';
 
 export const searchApi = {
@@ -69,5 +70,19 @@ export const searchApi = {
     const response = await apiClient.get<ApiResponse<SpecialtyItem[]>>('/specialties');
     return response.data;
   },
+
+  // 9. Shifokorning ma'lum sanadagi ochiq qabul vaqtlari (availability)
+  async getDoctorAvailability(
+    clinicId: string,
+    doctorId: string,
+    date: string
+  ): Promise<ApiResponse<PublicAvailabilityResponse>> {
+    const response = await apiClient.get<ApiResponse<PublicAvailabilityResponse>>(
+      `/public/clinics/${clinicId}/doctors/${doctorId}/availability`,
+      { params: { date } }
+    );
+    return response.data;
+  },
 };
+
 

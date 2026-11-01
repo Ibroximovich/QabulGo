@@ -22,6 +22,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { DoctorBookingCalendar } from '../components/DoctorBookingCalendar';
 
 interface DoctorDetailPageProps {
   initialDoctor?: PublicDoctorDetail | null;
@@ -169,6 +170,12 @@ export function DoctorDetailPage({ initialDoctor }: DoctorDetailPageProps) {
             </div>
           </div>
         </div>
+
+        {/* Doctor Booking & Availability Calendar */}
+        <DoctorBookingCalendar
+          doctorId={doctor.doctor_id}
+          workplaces={doctor.workplaces}
+        />
 
         {/* Workplaces Section */}
         <div className="space-y-4">

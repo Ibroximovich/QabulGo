@@ -11,6 +11,7 @@ import {
   Search,
   Edit,
   Trash2,
+  Calendar,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -279,12 +280,22 @@ export function DoctorListPage() {
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <Button
                   size="sm"
+                  variant="primary"
+                  onClick={() => router.push(`/clinic/doctors/${doc.id || doc.doctor_id}/schedule`)}
+                  className="flex-1 gap-1.5 text-xs font-semibold"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Qabul jadvali
+                </Button>
+
+                <Button
+                  size="sm"
                   variant="outline"
                   onClick={() => router.push(`/clinic/doctors/${doc.id || doc.doctor_id}/edit`)}
-                  className="flex-1 gap-1 text-xs"
+                  className="gap-1 text-xs px-2.5"
+                  title="Tahrirlash"
                 >
                   <Edit className="w-3.5 h-3.5 text-slate-500" />
-                  Tahrirlash
                 </Button>
 
                 {doc.is_active && (

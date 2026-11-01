@@ -150,3 +150,6 @@ export interface SearchListResponse<T> {
   meta: SearchMeta;
 }
 
+export * from '@/features/clinic/types/schedule';
+
+
