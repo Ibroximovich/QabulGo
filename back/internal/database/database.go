@@ -44,12 +44,22 @@ func ConnectDB(cfg *config.Config) (*gorm.DB, error) {
 	sqlDB.SetConnMaxLifetime(cfg.DBConnMaxLifetime)
 	sqlDB.SetConnMaxIdleTime(15 * time.Minute)
 
-	// Ping database
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Ping database with retry for serverless/cold-start cloud databases (like Neon)
+	var pingErr error
+	for attempt := 1; attempt <= 3; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		pingErr = sqlDB.PingContext(ctx)
+		cancel()
+		if pingErr == nil {
+			break
+		}
+		if attempt < 3 {
+			time.Sleep(2 * time.Second)
+		}
+	}
 
-	if err := sqlDB.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("database ping failed: %w", err)
+	if pingErr != nil {
+		return nil, fmt.Errorf("database ping failed: %w", pingErr)
 	}
 
 	log.Println("Database connection established successfully")

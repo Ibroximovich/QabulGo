@@ -25,7 +25,7 @@ import { clinicApi } from '../api/clinicApi';
 import { WorkingHourItem, CreateClinicPayload } from '../types';
 import { formatPhone, isValidUzbekPhone } from '@/lib/utils/phone';
 import { UZBEKISTAN_REGIONS } from '@/lib/constants/regions';
-import { isValidMapLocationUrl } from '@/lib/utils/location';
+import { isValidMapLocationUrl, extractCoordinatesFromUrl } from '@/lib/utils/location';
 import { getMediaUrl } from '@/lib/utils/media';
 
 const WEEKDAYS = [
@@ -63,6 +63,8 @@ export function ClinicOnboardingPage() {
   const [address, setAddress] = useState('');
   const [locationUrl, setLocationUrl] = useState('');
   const [locationUrlError, setLocationUrlError] = useState<string | null>(null);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   const [workingHours, setWorkingHours] = useState<WorkingHourItem[]>(DEFAULT_WORKING_HOURS);
 
@@ -96,6 +98,8 @@ export function ClinicOnboardingPage() {
       setDistrict(existingClinicRes.district || '');
       setAddress(existingClinicRes.address || '');
       setLocationUrl(existingClinicRes.location_url || '');
+      setLatitude(typeof existingClinicRes.latitude === 'number' ? existingClinicRes.latitude : null);
+      setLongitude(typeof existingClinicRes.longitude === 'number' ? existingClinicRes.longitude : null);
       setLogoUrl(existingClinicRes.logo_url || '');
       setCoverImageUrl(existingClinicRes.cover_image_url || '');
       if (existingClinicRes.working_hours && existingClinicRes.working_hours.length > 0) {
@@ -119,6 +123,8 @@ export function ClinicOnboardingPage() {
         district: district || 'Yunusobod',
         address: address || 'Kiritilmagan',
         location_url: locationUrl.trim() || undefined,
+        latitude: latitude !== null ? latitude : undefined,
+        longitude: longitude !== null ? longitude : undefined,
         logo_url: logoUrl || undefined,
         cover_image_url: coverImageUrl || undefined,
         working_hours: workingHours,
@@ -431,6 +437,11 @@ export function ClinicOnboardingPage() {
                       setLocationUrlError('Faqat Google Maps yoki Yandex Maps linki qabul qilinadi');
                     } else {
                       setLocationUrlError(null);
+                      const parsed = extractCoordinatesFromUrl(val);
+                      if (parsed) {
+                        setLatitude(parsed.latitude);
+                        setLongitude(parsed.longitude);
+                      }
                     }
                   }}
                 />

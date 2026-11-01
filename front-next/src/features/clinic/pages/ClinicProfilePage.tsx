@@ -12,7 +12,9 @@ import {
   Loader2,
   MapPin,
   ExternalLink,
+  Navigation,
 } from 'lucide-react';
+import { InteractiveMap } from '@/components/map/InteractiveMap';
 import { UZBEKISTAN_REGIONS } from '@/lib/constants/regions';
 import { isValidMapLocationUrl } from '@/lib/utils/location';
 import { ClinicDetail, WorkingHourItem, UpdateClinicPayload } from '../types';
@@ -53,6 +55,8 @@ export function ClinicProfilePage() {
   const [address, setAddress] = useState('');
   const [locationUrl, setLocationUrl] = useState('');
   const [locationUrlError, setLocationUrlError] = useState<string | null>(null);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   const [workingHours, setWorkingHours] = useState<WorkingHourItem[]>([]);
 
@@ -71,6 +75,8 @@ export function ClinicProfilePage() {
       setDistrict(clinic.district || '');
       setAddress(clinic.address || '');
       setLocationUrl(clinic.location_url || '');
+      setLatitude(typeof clinic.latitude === 'number' ? clinic.latitude : null);
+      setLongitude(typeof clinic.longitude === 'number' ? clinic.longitude : null);
       setLogoUrl(clinic.logo_url || '');
       setCoverImageUrl(clinic.cover_image_url || '');
       if (clinic.working_hours && clinic.working_hours.length > 0) {
@@ -95,6 +101,8 @@ export function ClinicProfilePage() {
         district,
         address,
         location_url: locationUrl ? locationUrl.trim() : undefined,
+        latitude: latitude !== null ? latitude : undefined,
+        longitude: longitude !== null ? longitude : undefined,
         logo_url: logoUrl || undefined,
         cover_image_url: coverImageUrl || undefined,
         working_hours: workingHours,
@@ -328,6 +336,91 @@ export function ClinicProfilePage() {
                   </a>
                 </div>
               )}
+
+              {/* Interactive Map Picker for Clinic Coordinates */}
+              <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs font-bold text-brand-navy flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-brand-blue" />
+                      <span>Klinika koordinatalari (Xaritada belgilash)</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Xaritadagi nuqtani bosing yoki markerni surib aniq lokatsiyani belgilang.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!navigator.geolocation) {
+                          toast.error('Brauzer geolokatsiyani qo‘llab-quvvatlamaydi');
+                          return;
+                        }
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            setLatitude(parseFloat(pos.coords.latitude.toFixed(6)));
+                            setLongitude(parseFloat(pos.coords.longitude.toFixed(6)));
+                            toast.success('Joriy joylashuv koordinatalari o‘rnatildi');
+                          },
+                          () => {
+                            toast.error('Geolokatsiyani aniqlashga ruxsat berilmadi');
+                          }
+                        );
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 text-brand-teal text-xs font-semibold hover:bg-teal-100 transition-colors border border-teal-100"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      <span>Joriy lokatsiyamni belgilash</span>
+                    </button>
+
+                    {latitude !== null && longitude !== null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLatitude(null);
+                          setLongitude(null);
+                        }}
+                        className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1"
+                      >
+                        Tozalash
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl overflow-hidden border border-slate-200">
+                  <InteractiveMap
+                    pickerMode={true}
+                    pickedLocation={
+                      latitude !== null && longitude !== null ? { latitude, longitude } : null
+                    }
+                    onLocationPick={(coords) => {
+                      setLatitude(coords.latitude);
+                      setLongitude(coords.longitude);
+                    }}
+                    height="320px"
+                    zoom={latitude !== null && longitude !== null ? 15 : 12}
+                    center={
+                      latitude !== null && longitude !== null
+                        ? [latitude, longitude]
+                        : [41.311081, 69.240562]
+                    }
+                  />
+                </div>
+
+                {latitude !== null && longitude !== null && (
+                  <div className="flex items-center gap-4 text-xs font-mono bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-slate-700">
+                    <span>
+                      <strong>Kenglik (Lat):</strong> {latitude}
+                    </span>
+                    <span>
+                      <strong>Uzunlik (Lon):</strong> {longitude}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

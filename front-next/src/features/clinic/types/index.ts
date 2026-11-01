@@ -7,6 +7,10 @@ export interface WorkingHourItem {
   opening_time: string; // HH:mm
   closing_time: string; // HH:mm
   is_closed: boolean;
+  day_of_week?: number;
+  open_time?: string;
+  close_time?: string;
+  is_open?: boolean;
 }
 
 export interface Specialty {
@@ -43,6 +47,8 @@ export interface ClinicDetail {
   district: string;
   address: string;
   location_url?: string;
+  latitude?: number;
+  longitude?: number;
   logo_url: string;
   cover_image_url: string;
   status: ClinicStatus;
@@ -51,6 +57,7 @@ export interface ClinicDetail {
   working_hours: WorkingHourItem[];
   doctors_count: number;
   doctors?: ClinicDoctorItem[];
+  specialties?: Specialty[];
   created_at: string;
   updated_at: string;
 }
@@ -65,6 +72,8 @@ export interface ClinicSummary {
   district: string;
   address: string;
   location_url?: string;
+  latitude?: number;
+  longitude?: number;
   logo_url: string;
   cover_image_url: string;
   status: ClinicStatus;
@@ -80,6 +89,8 @@ export interface CreateClinicPayload {
   district: string;
   address: string;
   location_url?: string;
+  latitude?: number;
+  longitude?: number;
   logo_url?: string;
   cover_image_url?: string;
   working_hours?: WorkingHourItem[];
@@ -94,6 +105,8 @@ export interface UpdateClinicPayload {
   district?: string;
   address?: string;
   location_url?: string;
+  latitude?: number;
+  longitude?: number;
   logo_url?: string;
   cover_image_url?: string;
   working_hours?: WorkingHourItem[];

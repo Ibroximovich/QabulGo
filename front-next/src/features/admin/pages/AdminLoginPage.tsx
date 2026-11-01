@@ -22,7 +22,7 @@ export function AdminLoginPage() {
 
   // Agar allaqachon superadmin sifatida kirgan bo'lsa, panel sahifasiga yo'naltir
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.role === 'superadmin') {
+    if (!authLoading && isAuthenticated && (user?.role === 'super_admin' || (user?.role as unknown) === 'superadmin')) {
       router.replace('/admin/clinics');
     }
   }, [authLoading, isAuthenticated, user, router]);

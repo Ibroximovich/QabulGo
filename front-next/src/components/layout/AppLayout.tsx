@@ -45,25 +45,25 @@ export function AppLayout({ children }: AppLayoutProps) {
       name: 'Kabinet',
       href: '/dashboard',
       icon: LayoutDashboard,
-      isAvailable: true,
+      isAvailable: !!user,
     },
     {
       name: 'Profilim',
       href: '/profile',
       icon: User,
-      isAvailable: true,
+      isAvailable: !!user,
     },
     {
       name: 'Klinikalar',
-      href: '#',
+      href: '/clinics',
       icon: Building2,
-      isAvailable: false,
+      isAvailable: true,
     },
     {
       name: 'Shifokorlar',
-      href: '#',
+      href: '/doctors',
       icon: Stethoscope,
-      isAvailable: false,
+      isAvailable: true,
     },
     {
       name: 'Qabulga yozilish',
@@ -140,72 +140,89 @@ export function AppLayout({ children }: AppLayoutProps) {
               </nav>
             </div>
 
-            {/* Right Side: Profile Menu & Mobile Toggle */}
+            {/* Right Side: Profile Menu or Auth Links */}
             <div className="flex items-center gap-3">
-              {/* Profile Dropdown (Desktop) */}
-              <div className="relative hidden sm:block">
-                <button
-                  type="button"
-                  onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-3 p-1.5 pr-3 rounded-full hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
-                  aria-expanded={isProfileMenuOpen}
-                  aria-haspopup="true"
-                >
-                  <div className="h-9 w-9 rounded-full gradient-primary text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                    {userInitials}
-                  </div>
-                  <div className="text-left hidden md:block">
-                    <p className="text-xs font-bold text-brand-navy leading-tight truncate max-w-[140px]">
-                      {userFullName}
-                    </p>
-                    <p className="text-[11px] text-brand-muted leading-tight truncate max-w-[140px]">
-                      {user?.email}
-                    </p>
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-brand-muted" />
-                </button>
-
-                {/* Dropdown Menu */}
-                {isProfileMenuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-20"
-                      onClick={() => setIsProfileMenuOpen(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-elevated border border-slate-100 py-2 z-30 animate-slide-up">
-                      <div className="px-4 py-2.5 border-b border-slate-100">
-                        <p className="text-xs font-semibold text-brand-navy">{userFullName}</p>
-                        <p className="text-xs text-brand-muted truncate">{user?.email}</p>
-                        <span className="inline-block mt-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                          Bemor akkaunti
-                        </span>
-                      </div>
-
-                      <div className="py-1">
-                        <Link
-                          href="/profile"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-brand-navy hover:bg-slate-50 transition-colors"
-                        >
-                          <User className="h-4 w-4 text-brand-muted" />
-                          <span>Profil ma’lumotlari</span>
-                        </Link>
-                      </div>
-
-                      <div className="pt-1 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={handleLogout}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-brand-error hover:bg-red-50 transition-colors text-left"
-                        >
-                          <LogOut className="h-4 w-4 text-brand-error" />
-                          <span>Chiqish</span>
-                        </button>
-                      </div>
+              {user ? (
+                /* Profile Dropdown (Desktop) */
+                <div className="relative hidden sm:block">
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+                    className="flex items-center gap-3 p-1.5 pr-3 rounded-full hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
+                    aria-expanded={isProfileMenuOpen}
+                    aria-haspopup="true"
+                  >
+                    <div className="h-9 w-9 rounded-full gradient-primary text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                      {userInitials}
                     </div>
-                  </>
-                )}
-              </div>
+                    <div className="text-left hidden md:block">
+                      <p className="text-xs font-bold text-brand-navy leading-tight truncate max-w-[140px]">
+                        {userFullName}
+                      </p>
+                      <p className="text-[11px] text-brand-muted leading-tight truncate max-w-[140px]">
+                        {user?.email}
+                      </p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-brand-muted" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isProfileMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-20"
+                        onClick={() => setIsProfileMenuOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-elevated border border-slate-100 py-2 z-30 animate-slide-up">
+                        <div className="px-4 py-2.5 border-b border-slate-100">
+                          <p className="text-xs font-semibold text-brand-navy">{userFullName}</p>
+                          <p className="text-xs text-brand-muted truncate">{user?.email}</p>
+                          <span className="inline-block mt-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            Bemor akkaunti
+                          </span>
+                        </div>
+
+                        <div className="py-1">
+                          <Link
+                            href="/profile"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2 text-sm text-brand-navy hover:bg-slate-50 transition-colors"
+                          >
+                            <User className="h-4 w-4 text-brand-muted" />
+                            <span>Profil ma’lumotlari</span>
+                          </Link>
+                        </div>
+
+                        <div className="pt-1 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-brand-error hover:bg-red-50 transition-colors text-left"
+                          >
+                            <LogOut className="h-4 w-4 text-brand-error" />
+                            <span>Chiqish</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center gap-2">
+                  <Link
+                    href="/login"
+                    className="px-4 py-2 text-xs font-semibold rounded-xl text-brand-navy hover:bg-slate-100 transition-colors"
+                  >
+                    Kirish
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-brand-blue text-white hover:bg-brand-blue-600 shadow-xs transition-colors"
+                  >
+                    Ro‘yxatdan o‘tish
+                  </Link>
+                </div>
+              )}
 
               {/* Mobile Menu Button */}
               <button
@@ -223,16 +240,36 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-3 animate-fade-in">
-            {/* User summary on mobile */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-brand-bg border border-slate-100">
-              <div className="h-10 w-10 rounded-full gradient-primary text-white font-bold text-sm flex items-center justify-center shrink-0">
-                {userInitials}
+            {/* User summary on mobile or Auth buttons */}
+            {user ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-brand-bg border border-slate-100">
+                <div className="h-10 w-10 rounded-full gradient-primary text-white font-bold text-sm flex items-center justify-center shrink-0">
+                  {userInitials}
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-sm font-bold text-brand-navy truncate">{userFullName}</p>
+                  <p className="text-xs text-brand-muted truncate">{user?.email}</p>
+                </div>
               </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-bold text-brand-navy truncate">{userFullName}</p>
-                <p className="text-xs text-brand-muted truncate">{user?.email}</p>
+            ) : (
+              
+              <div className="grid grid-cols-2 gap-2 p-2 bg-brand-bg rounded-2xl border border-slate-100">
+                <Link
+                  href="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-center py-2.5 text-xs font-semibold rounded-xl bg-white text-brand-navy border border-slate-200 text-center"
+                >
+                  Kirish
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-center py-2.5 text-xs font-bold rounded-xl bg-brand-blue text-white text-center shadow-xs"
+                >
+                  Ro‘yxatdan o‘tish
+                </Link>
               </div>
-            </div>
+            )}
 
             {/* Mobile Nav Links */}
             <nav className="space-y-1">
@@ -276,17 +313,19 @@ export function AppLayout({ children }: AppLayoutProps) {
               })}
             </nav>
 
-            {/* Mobile Logout Button */}
-            <div className="pt-3 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-brand-error rounded-xl hover:bg-red-50 transition-colors"
-              >
-                <LogOut className="h-5 w-5 text-brand-error" />
-                <span>Chiqish</span>
-              </button>
-            </div>
+            {/* Mobile Logout Button (only if logged in) */}
+            {user && (
+              <div className="pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-brand-error rounded-xl hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="h-5 w-5 text-brand-error" />
+                  <span>Chiqish</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </header>
