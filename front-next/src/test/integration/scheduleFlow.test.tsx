@@ -87,9 +87,8 @@ describe('Doctor Booking Calendar Integration', () => {
       expect(screen.getByText(/11:00 – 12:00/i)).toBeInTheDocument();
     });
 
-    // 4. "Tez kunda" booking button
+    // 4. Booking button is initially disabled until slot is chosen
     expect(screen.getByRole('button', { name: /qabulga yozilish/i })).toBeDisabled();
-    expect(screen.getAllByText(/tez kunda/i).length).toBeGreaterThan(0);
   });
 
   it('renders empty state when no slots are available for a date', async () => {

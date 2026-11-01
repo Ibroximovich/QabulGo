@@ -45,20 +45,27 @@ type ScheduleService interface {
 }
 
 type scheduleService struct {
-	scheduleRepo repositories.ScheduleRepository
-	clinicRepo   repositories.ClinicRepository
-	auditRepo    repositories.AuditRepository
+	scheduleRepo    repositories.ScheduleRepository
+	clinicRepo      repositories.ClinicRepository
+	auditRepo       repositories.AuditRepository
+	appointmentRepo repositories.AppointmentRepository
 }
 
 func NewScheduleService(
 	scheduleRepo repositories.ScheduleRepository,
 	clinicRepo repositories.ClinicRepository,
 	auditRepo repositories.AuditRepository,
+	appointmentRepo ...repositories.AppointmentRepository,
 ) ScheduleService {
+	var apptRepo repositories.AppointmentRepository
+	if len(appointmentRepo) > 0 {
+		apptRepo = appointmentRepo[0]
+	}
 	return &scheduleService{
-		scheduleRepo: scheduleRepo,
-		clinicRepo:   clinicRepo,
-		auditRepo:    auditRepo,
+		scheduleRepo:    scheduleRepo,
+		clinicRepo:      clinicRepo,
+		auditRepo:       auditRepo,
+		appointmentRepo: apptRepo,
 	}
 }
 
@@ -348,6 +355,46 @@ func (s *scheduleService) SaveWeeklySchedule(
 		})
 	}
 
+	// 5. Protect future confirmed appointments from schedule changes
+	if s.appointmentRepo != nil {
+		loc := getTashkentLocation()
+		todayStr := time.Now().In(loc).Format("2006-01-02")
+		futureAppts, err := s.appointmentRepo.FindFutureConfirmedAppointmentsForDoctor(ctx, cd.ID, todayStr)
+		if err != nil {
+			return nil, fmt.Errorf("kelajakdagi tasdiqlangan qabullarni tekshirishda xatolik: %w", err)
+		}
+
+		for _, appt := range futureAppts {
+			apptDate, err := time.ParseInLocation("2006-01-02", appt.AppointmentDate, loc)
+			if err != nil {
+				continue
+			}
+			apptWeekday := int(apptDate.Weekday())
+			if apptWeekday == 0 {
+				apptWeekday = 7
+			}
+
+			stillExists := false
+			for _, newSlot := range modelSlots {
+				if newSlot.Weekday == apptWeekday && newSlot.Status == models.SlotStatusActive {
+					if newSlot.StartTime <= appt.StartTime && newSlot.EndTime >= appt.EndTime {
+						stillExists = true
+						break
+					}
+				}
+			}
+
+			if !stillExists {
+				patientName := "Bemor"
+				if appt.Patient != nil {
+					patientName = fmt.Sprintf("%s %s", appt.Patient.FirstName, appt.Patient.LastName)
+				}
+				return nil, fmt.Errorf("%w: %s sanasida %s-%s vaqtiga tasdiqlangan qabul mavjud (%s). Jadvalni o‘zgartirishdan oldin ushbu qabulni bekor qiling",
+					ErrScheduleBookingConflict, appt.AppointmentDate, appt.StartTime, appt.EndTime, patientName)
+			}
+		}
+	}
+
 	if err := s.scheduleRepo.ReplaceWeeklySlots(ctx, cd.ID, modelSlots); err != nil {
 		return nil, err
 	}
@@ -450,6 +497,31 @@ func (s *scheduleService) CreateDateException(
 		Reason:         req.Reason,
 	}
 
+	// Protect future confirmed bookings from date override
+	if s.appointmentRepo != nil {
+		if status == models.OverrideStatusDayOff {
+			conflicts, err := s.appointmentRepo.FindFutureConfirmedAppointmentsOnDate(ctx, cd.ID, req.Date, nil, nil)
+			if err != nil {
+				return nil, fmt.Errorf("tasdiqlangan qabullarni tekshirishda xatolik: %w", err)
+			}
+			if len(conflicts) > 0 {
+				first := conflicts[0]
+				return nil, fmt.Errorf("%w: %s sanasida %s-%s vaqtiga tasdiqlangan qabul mavjud. Ushbu sanani dam olish kuni qilishdan oldin qabulni bekor qiling",
+					ErrScheduleBookingConflict, first.AppointmentDate, first.StartTime, first.EndTime)
+			}
+		} else if status == models.OverrideStatusClosed && startTime != nil && endTime != nil {
+			conflicts, err := s.appointmentRepo.FindFutureConfirmedAppointmentsOnDate(ctx, cd.ID, req.Date, startTime, endTime)
+			if err != nil {
+				return nil, fmt.Errorf("tasdiqlangan qabullarni tekshirishda xatolik: %w", err)
+			}
+			if len(conflicts) > 0 {
+				first := conflicts[0]
+				return nil, fmt.Errorf("%w: %s sanasida %s-%s vaqtiga tasdiqlangan qabul mavjud. Ushbu slotni yopishdan oldin qabulni bekor qiling",
+					ErrScheduleBookingConflict, first.AppointmentDate, first.StartTime, first.EndTime)
+			}
+		}
+	}
+
 	if err := s.scheduleRepo.CreateDateOverride(ctx, override); err != nil {
 		return nil, err
 	}
@@ -534,6 +606,30 @@ func (s *scheduleService) UpdateDateException(
 		}
 		if sMins >= eMins {
 			return nil, ErrStartMustBeBeforeEnd
+		}
+	}
+
+	if s.appointmentRepo != nil {
+		if override.Status == models.OverrideStatusDayOff {
+			conflicts, err := s.appointmentRepo.FindFutureConfirmedAppointmentsOnDate(ctx, cd.ID, override.Date, nil, nil)
+			if err != nil {
+				return nil, fmt.Errorf("tasdiqlangan qabullarni tekshirishda xatolik: %w", err)
+			}
+			if len(conflicts) > 0 {
+				first := conflicts[0]
+				return nil, fmt.Errorf("%w: %s sanasida %s-%s vaqtiga tasdiqlangan qabul mavjud. Ushbu sanani dam olish kuni qilishdan oldin qabulni bekor qiling",
+					ErrScheduleBookingConflict, first.AppointmentDate, first.StartTime, first.EndTime)
+			}
+		} else if override.Status == models.OverrideStatusClosed && override.StartTime != nil && override.EndTime != nil {
+			conflicts, err := s.appointmentRepo.FindFutureConfirmedAppointmentsOnDate(ctx, cd.ID, override.Date, override.StartTime, override.EndTime)
+			if err != nil {
+				return nil, fmt.Errorf("tasdiqlangan qabullarni tekshirishda xatolik: %w", err)
+			}
+			if len(conflicts) > 0 {
+				first := conflicts[0]
+				return nil, fmt.Errorf("%w: %s sanasida %s-%s vaqtiga tasdiqlangan qabul mavjud. Ushbu slotni yopishdan oldin qabulni bekor qiling",
+					ErrScheduleBookingConflict, first.AppointmentDate, first.StartTime, first.EndTime)
+			}
 		}
 	}
 
@@ -682,7 +778,31 @@ func (s *scheduleService) GetPublicAvailability(
 		}
 	}
 
-	// 5. If date is TODAY, filter out past time slots
+	// 5. Exclude slots that are already booked (confirmed or completed)
+	if s.appointmentRepo != nil {
+		bookedAppts, err := s.appointmentRepo.GetBookedSlotsForDoctor(ctx, cd.DoctorID, dateStr)
+		if err != nil {
+			return nil, fmt.Errorf("band qabullarni olishda xatolik: %w", err)
+		}
+		if len(bookedAppts) > 0 {
+			var availableCandidates []slotEntry
+			for _, cs := range candidateSlots {
+				isBooked := false
+				for _, b := range bookedAppts {
+					if cs.start < b.EndTime && b.StartTime < cs.end {
+						isBooked = true
+						break
+					}
+				}
+				if !isBooked {
+					availableCandidates = append(availableCandidates, cs)
+				}
+			}
+			candidateSlots = availableCandidates
+		}
+	}
+
+	// 6. If date is TODAY, filter out past time slots
 	var finalSlots []dto.AvailabilitySlotDTO
 	for _, s := range candidateSlots {
 		if dateStr == todayTashkentStr {
@@ -696,7 +816,7 @@ func (s *scheduleService) GetPublicAvailability(
 		})
 	}
 
-	// 6. Sort chronologically by start time
+	// 7. Sort chronologically by start time
 	sort.Slice(finalSlots, func(i, j int) bool {
 		return finalSlots[i].StartTime < finalSlots[j].StartTime
 	})

@@ -39,6 +39,8 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	// Try loading .env if it exists, ignore if not found
 	_ = godotenv.Load()
+	_ = godotenv.Load("../.env")
+	_ = godotenv.Load("../../.env")
 
 	cfg := &Config{
 		AppEnv:            getEnv("APP_ENV", "development"),

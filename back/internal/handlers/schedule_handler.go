@@ -103,6 +103,10 @@ func (h *ScheduleHandler) GetWeeklySchedule(c *gin.Context) {
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse(err.Error(), nil))
 			return
 		}
+		if errors.Is(err, services.ErrScheduleBookingConflict) {
+			c.JSON(http.StatusConflict, dto.NewErrorResponse(err.Error(), nil))
+			return
+		}
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("Jadvalni yuklashda xatolik", nil))
 		return
 	}
@@ -159,7 +163,11 @@ func (h *ScheduleHandler) SaveWeeklySchedule(c *gin.Context) {
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse(err.Error(), nil))
 			return
 		}
-		if errors.Is(err, repositories.ErrCrossClinicConflict) {
+		if errors.Is(err, services.ErrScheduleBookingConflict) {
+			c.JSON(http.StatusConflict, dto.NewErrorResponse(err.Error(), nil))
+			return
+		}
+		if errors.Is(err, repositories.ErrCrossClinicConflict) || errors.Is(err, services.ErrScheduleBookingConflict) {
 			c.JSON(http.StatusConflict, dto.NewErrorResponse(err.Error(), nil))
 			return
 		}
@@ -204,6 +212,10 @@ func (h *ScheduleHandler) GetExceptions(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, repositories.ErrClinicDoctorNotFound) {
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse(err.Error(), nil))
+			return
+		}
+		if errors.Is(err, services.ErrScheduleBookingConflict) {
+			c.JSON(http.StatusConflict, dto.NewErrorResponse(err.Error(), nil))
 			return
 		}
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("Istisnolarni yuklashda xatolik", nil))
@@ -259,6 +271,10 @@ func (h *ScheduleHandler) CreateException(c *gin.Context) {
 		}
 		if errors.Is(err, repositories.ErrClinicDoctorNotFound) {
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse(err.Error(), nil))
+			return
+		}
+		if errors.Is(err, services.ErrScheduleBookingConflict) {
+			c.JSON(http.StatusConflict, dto.NewErrorResponse(err.Error(), nil))
 			return
 		}
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse(err.Error(), nil))

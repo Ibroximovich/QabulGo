@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Users,
   Building2,
+  Calendar,
   LogOut,
   Menu,
   X,
@@ -74,6 +75,12 @@ export function ClinicLayout({ children }: ClinicLayoutProps) {
       label: 'Boshqaruv paneli',
       icon: LayoutDashboard,
       disabled: false,
+    },
+    {
+      to: '/clinic/appointments',
+      label: 'Bronlar',
+      icon: Calendar,
+      disabled: status !== 'approved',
     },
     {
       to: '/clinic/doctors',

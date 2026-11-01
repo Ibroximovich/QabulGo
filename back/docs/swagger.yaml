@@ -6,6 +6,99 @@ definitions:
         example: Tibbiy litsenziya ma'lumotlari kiritilmagan
         type: string
     type: object
+  dto.AppointmentClinicDTO:
+    properties:
+      address:
+        type: string
+      district:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      region:
+        type: string
+    type: object
+  dto.AppointmentDoctorDTO:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      photo_url:
+        type: string
+      specialty:
+        type: string
+    type: object
+  dto.AppointmentListResponseDTO:
+    properties:
+      appointments:
+        items:
+          $ref: '#/definitions/dto.AppointmentResponseDTO'
+        type: array
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AppointmentPatientDTO:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      phone:
+        type: string
+    type: object
+  dto.AppointmentResponseDTO:
+    properties:
+      appointment_date:
+        type: string
+      cancellation_reason:
+        type: string
+      cancelled_at:
+        type: string
+      clinic:
+        $ref: '#/definitions/dto.AppointmentClinicDTO'
+      clinic_doctor_id:
+        type: string
+      clinic_id:
+        type: string
+      completed_at:
+        type: string
+      consultation_price:
+        type: number
+      created_at:
+        type: string
+      doctor:
+        $ref: '#/definitions/dto.AppointmentDoctorDTO'
+      doctor_id:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      no_show_at:
+        type: string
+      patient:
+        $ref: '#/definitions/dto.AppointmentPatientDTO'
+      patient_id:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
   dto.AvailabilitySlotDTO:
     properties:
       end_time:
@@ -13,6 +106,12 @@ definitions:
         type: string
       start_time:
         example: "09:00"
+        type: string
+    type: object
+  dto.CancelAppointmentRequest:
+    properties:
+      reason:
+        example: Rejalarim o‘zgarib qoldi
         type: string
     type: object
   dto.ClinicDetailDTO:
@@ -175,6 +274,33 @@ definitions:
         type: string
       status:
         type: string
+    type: object
+  dto.CreateAppointmentRequest:
+    properties:
+      clinic_id:
+        example: e202c1aa-9f7b-6492-88b4-75ce67d7808b
+        type: string
+      date:
+        description: YYYY-MM-DD
+        example: "2026-11-09"
+        type: string
+      doctor_id:
+        example: 23f77e06-d956-4789-8c8a-2ccbec8c4a2d
+        type: string
+      end_time:
+        description: HH:mm
+        example: "11:00"
+        type: string
+      start_time:
+        description: HH:mm
+        example: "10:00"
+        type: string
+    required:
+    - clinic_id
+    - date
+    - doctor_id
+    - end_time
+    - start_time
     type: object
   dto.CreateClinicRequest:
     properties:
@@ -1125,6 +1251,162 @@ paths:
       summary: Klinikani bloklash / to‘xtatish
       tags:
       - Superadmin
+  /api/v1/appointments:
+    post:
+      consumes:
+      - application/json
+      description: Bemor tanlagan shifokor va slot bo‘yicha appointment yaratadi (darhol
+        confirmed bo‘ladi)
+      parameters:
+      - description: Takroriy yuborishning oldini olish kaliti
+        in: header
+        name: Idempotency-Key
+        type: string
+      - description: Bron ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateAppointmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Qabulga muvaffaqiyatli yozildingiz
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentResponseDTO'
+              type: object
+        "400":
+          description: Noto‘g‘ri ma’lumot yoki o‘tib ketgan vaqt
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Avtorizatsiya talab qilinadi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Faqat bemorlar bron qila oladi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Klinika yoki shifokor topilmadi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Double booking to‘qnashuvi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Shifokor qabuliga bron qilish (Avtomatik tasdiqlanadi)
+      tags:
+      - Appointments
+  /api/v1/appointments/{id}:
+    get:
+      parameters:
+      - description: Appointment UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Qabul ma’lumotlari
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentResponseDTO'
+              type: object
+        "403":
+          description: Boshqa bemorning bron ma'lumotlariga kirish taqiqlanadi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Qabul topilmadi
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Bemorning bitta qabul ma’lumotini olish
+      tags:
+      - Appointments
+  /api/v1/appointments/{id}/cancel:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Appointment UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Bekor qilish sababi
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/dto.CancelAppointmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Qabul bekor qilindi
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentResponseDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Bemor tomonidan qabulni bekor qilish
+      tags:
+      - Appointments
+  /api/v1/appointments/my:
+    get:
+      description: Bemor o‘ziga tegishli barcha qabullarni ko‘radi
+      parameters:
+      - description: upcoming, past, cancelled
+        in: query
+        name: timeframe
+        type: string
+      - description: confirmed, cancelled, completed, no_show
+        in: query
+        name: status
+        type: string
+      - description: Sahifa raqami
+        in: query
+        name: page
+        type: integer
+      - description: Sahifadagi yozuvlar soni
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Qabullar ro‘yxati
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentListResponseDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Bemorning o‘z qabullari ro‘yxatini olish
+      tags:
+      - Appointments
   /api/v1/auth/admin/login:
     post:
       consumes:
@@ -1568,6 +1850,186 @@ paths:
       summary: Klinika ma’lumotlarini tahrirlash
       tags:
       - Clinic Profile
+  /api/v1/clinics/{id}/appointments:
+    get:
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Aniq sana (YYYY-MM-DD)
+        in: query
+        name: date
+        type: string
+      - description: Sanadan boshlab
+        in: query
+        name: date_from
+        type: string
+      - description: Sanagacha
+        in: query
+        name: date_to
+        type: string
+      - description: Shifokor UUID
+        in: query
+        name: doctor_id
+        type: string
+      - description: confirmed, cancelled, completed, no_show
+        in: query
+        name: status
+        type: string
+      - description: Sahifa
+        in: query
+        name: page
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika qabullari
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentListResponseDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Klinikaning barcha shifokorlari bo‘yicha qabullarni ko‘rish
+      tags:
+      - Clinic Appointments
+  /api/v1/clinics/{id}/appointments/{appointmentId}:
+    get:
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Appointment UUID
+        in: path
+        name: appointmentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Qabul ma’lumotlari
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentResponseDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Klinika uchun bitta qabulning to‘liq ma’lumotini olish
+      tags:
+      - Clinic Appointments
+  /api/v1/clinics/{id}/appointments/{appointmentId}/cancel:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Appointment UUID
+        in: path
+        name: appointmentId
+        required: true
+        type: string
+      - description: Bekor qilish sababi
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/dto.CancelAppointmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Qabul bekor qilindi
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentResponseDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Klinika xodimi tomonidan qabulni bekor qilish
+      tags:
+      - Clinic Appointments
+  /api/v1/clinics/{id}/appointments/{appointmentId}/complete:
+    post:
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Appointment UUID
+        in: path
+        name: appointmentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Qabul yakunlandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentResponseDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Qabul yakunlanganini belgilash (faqat vaqti kelgandan so‘ng)
+      tags:
+      - Clinic Appointments
+  /api/v1/clinics/{id}/appointments/{appointmentId}/no-show:
+    post:
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Appointment UUID
+        in: path
+        name: appointmentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bemor kelmagan deb qayd etildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AppointmentResponseDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Bemor qabulga kelmaganini belgilash (faqat vaqti kelgandan so‘ng)
+      tags:
+      - Clinic Appointments
   /api/v1/clinics/{id}/doctors:
     get:
       description: Filtrlash, qidirish va sahifalash imkoniyati bilan

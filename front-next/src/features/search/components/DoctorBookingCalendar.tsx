@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -12,14 +14,23 @@ import {
   CalendarOff,
   ChevronRight,
   Info,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { searchApi } from '../api/searchApi';
 import { DoctorClinicWorkplace, AvailabilitySlot } from '../types';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
+import { useAuth } from '@/providers/AuthProvider';
+import { useCreateAppointment } from '@/features/appointments/hooks/useAppointments';
+import { BookingConfirmationModal } from '@/features/appointments/components/BookingConfirmationModal';
+import { BookingSuccessModal } from '@/features/appointments/components/BookingSuccessModal';
+import { Appointment } from '@/features/appointments/types';
 
 interface DoctorBookingCalendarProps {
   doctorId: string;
+  doctorName?: string;
+  specialtyName?: string;
   workplaces: DoctorClinicWorkplace[];
 }
 
@@ -62,7 +73,40 @@ function getTashkentTodayString(): string {
   return tashkentDate.toISOString().split('T')[0];
 }
 
-export function DoctorBookingCalendar({ doctorId, workplaces }: DoctorBookingCalendarProps) {
+function useSafeAuth() {
+  try {
+    return useAuth();
+  } catch {
+    return {
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: () => {},
+      logout: async () => {},
+      updateUser: () => {},
+      refetchUser: async () => {},
+    };
+  }
+}
+
+export function DoctorBookingCalendar({
+  doctorId,
+  doctorName,
+  specialtyName,
+  workplaces,
+}: DoctorBookingCalendarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, isAuthenticated } = useSafeAuth();
+  const createAppointmentMutation = useCreateAppointment();
+
+  // Modal & Booking States
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
+  const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState<string>('');
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
   // 1. Selected Workplace (default to first)
   const [selectedClinicId, setSelectedClinicId] = useState<string>(
     workplaces?.[0]?.clinic_id || ''
@@ -119,6 +163,7 @@ export function DoctorBookingCalendar({ doctorId, workplaces }: DoctorBookingCal
     data: availabilityData,
     isLoading: isLoadingSlots,
     isError,
+    refetch: refetchAvailability,
   } = useQuery({
     queryKey: ['publicAvailability', selectedClinicId, doctorId, selectedDate],
     queryFn: async () => {
@@ -153,6 +198,96 @@ export function DoctorBookingCalendar({ doctorId, workplaces }: DoctorBookingCal
     ][dateObj.getDay()];
     return `${day}-${month}, ${weekday}`;
   }, [selectedDate]);
+
+  const handleOpenBookingModal = () => {
+    if (!selectedSlot) return;
+
+    if (!isAuthenticated) {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(
+            'qabulgo_booking_intent',
+            JSON.stringify({
+              clinicId: selectedClinicId,
+              doctorId,
+              date: selectedDate,
+              startTime: selectedSlot.start_time,
+              endTime: selectedSlot.end_time,
+              returnUrl: pathname,
+            })
+          );
+        } catch {
+          // ignore session storage error
+        }
+      }
+      toast.info('Qabulga yozilish uchun avval tizimga kiring');
+      router.push(`/login?redirect=${encodeURIComponent(pathname || `/doctors/${doctorId}`)}`);
+      return;
+    }
+
+    if (user?.role && user.role !== 'patient') {
+      toast.error(
+        'Faqat bemor foydalanuvchilar shifokor qabuliga yozilishi mumkin. Iltimos, bemor hisobi bilan kiring.'
+      );
+      return;
+    }
+
+    let newKey = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        newKey = crypto.randomUUID();
+      }
+    } catch {
+      // fallback key
+    }
+    setIdempotencyKey(newKey);
+    setBookingError(null);
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!selectedSlot || !activeWorkplace) return;
+
+    try {
+      setBookingError(null);
+      const result = await createAppointmentMutation.mutateAsync({
+        payload: {
+          clinic_id: selectedClinicId,
+          doctor_id: doctorId,
+          date: selectedDate,
+          start_time: selectedSlot.start_time,
+          end_time: selectedSlot.end_time,
+        },
+        idempotencyKey,
+      });
+
+      const apptData = (result as any)?.appointment || (result as any)?.data || (result as any);
+      setCreatedAppointment(apptData);
+      setIsConfirmModalOpen(false);
+      setIsSuccessModalOpen(true);
+      setSelectedSlot(null);
+      toast.success('Qabulga muvaffaqiyatli yozildingiz! Bron avtomatik tasdiqlandi.');
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const errorMessage =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Bron qilishda xatolik yuz berdi';
+
+      if (status === 409) {
+        const conflictMsg = 'Bu qabul vaqti allaqachon band qilingan. Iltimos, boshqa vaqtni tanlang.';
+        setBookingError(conflictMsg);
+        toast.error(conflictMsg);
+        setIsConfirmModalOpen(false);
+        setSelectedSlot(null);
+        refetchAvailability();
+      } else {
+        setBookingError(errorMessage);
+        toast.error(errorMessage);
+      }
+    }
+  };
 
   if (!workplaces || workplaces.length === 0) {
     return null;
@@ -386,25 +521,54 @@ export function DoctorBookingCalendar({ doctorId, workplaces }: DoctorBookingCal
           </div>
           <p className="text-[11px] text-slate-500 flex items-center gap-1">
             <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            Onlayn to‘lov va bron qilish funksiyasi tez kunda ishga tushiriladi.
+            {selectedSlot
+              ? 'Qabulga yozilish bepul va avtomatik tarzda darhol tasdiqlanadi.'
+              : 'Shifokor jadvalidan o‘zingizga ma’qul bo‘sh vaqt oralig‘ini bosing.'}
           </p>
         </div>
 
         <div className="w-full sm:w-auto">
-          <button
+          <Button
             type="button"
-            disabled
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-brand-blue/70 text-white font-bold text-xs shadow-xs cursor-not-allowed select-none"
-            title="Qabulga yozilish tez kunda ishga tushadi"
+            variant="primary"
+            disabled={!selectedSlot || createAppointmentMutation.isPending}
+            onClick={handleOpenBookingModal}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl shadow-xs"
           >
             <CalendarIcon className="w-4 h-4" />
             <span>Qabulga yozilish</span>
-            <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-white/25 text-white ml-1">
-              Tez kunda
-            </span>
-          </button>
+          </Button>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <BookingConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => {
+          if (!createAppointmentMutation.isPending) {
+            setIsConfirmModalOpen(false);
+            setBookingError(null);
+          }
+        }}
+        onConfirm={handleConfirmBooking}
+        isLoading={createAppointmentMutation.isPending}
+        doctorName={doctorName || 'Shifokor'}
+        specialty={specialtyName}
+        clinicName={activeWorkplace?.clinic_name || 'Klinika'}
+        clinicAddress={activeWorkplace?.address}
+        dateFormatted={formattedSelectedDate}
+        startTime={selectedSlot?.start_time || ''}
+        endTime={selectedSlot?.end_time || ''}
+        price={activeWorkplace?.consultation_price || 0}
+        error={bookingError}
+      />
+
+      {/* Instant Success Modal */}
+      <BookingSuccessModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        appointment={createdAppointment}
+      />
     </div>
   );
 }

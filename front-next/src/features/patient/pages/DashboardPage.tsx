@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   AlertCircle,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -25,34 +26,52 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { usePatientProfile } from '../hooks/usePatientProfile';
 import { formatDateUz, formatRoleUz } from '@/lib/utils/formatters';
 import { formatUzbekPhoneDisplay } from '@/lib/utils/phone';
+import { useMyAppointments } from '@/features/appointments/hooks/useAppointments';
+import { AppointmentStatusBadge } from '@/features/appointments/components/AppointmentStatusBadge';
 
 export function DashboardPage() {
   const { data: profile, isLoading, isError, refetch } = usePatientProfile();
 
-  const upcomingFeatures = [
+  // Fetch upcoming appointment for quick preview
+  const { data: appointmentsData, isLoading: isLoadingAppointments } = useMyAppointments({
+    timeframe: 'upcoming',
+    limit: 1,
+  });
+
+  const nextAppointment = appointmentsData?.appointments?.[0];
+
+  const quickServices = [
     {
       title: 'Klinikalar katalogi',
       description: 'O‘zbekistondagi nufuzli xususiy klinikalarni joylashuvi va xizmatlari bo‘yicha qidiring.',
       icon: Building2,
-      badge: 'Tez kunda',
+      href: '/clinics',
+      badge: 'Faol',
+      badgeVariant: 'success' as const,
     },
     {
       title: 'Mutaxassis shifokorlar',
-      description: 'Tajribali shifokorlar reytingi, ko‘rik narxlari va sharhlar bilan tanishing.',
+      description: 'Tajribali shifokorlar reytingi, ko‘rik narxlari va qabul jadvallari bilan tanishing.',
       icon: Stethoscope,
-      badge: 'Tez kunda',
+      href: '/doctors',
+      badge: 'Faol',
+      badgeVariant: 'success' as const,
     },
     {
       title: 'Onlayn navbat olish',
       description: 'Shifokorning bo‘sh vaqtlaridan o‘zingizga mos soatni tanlab, 1 daqiqada qabulga yoziling.',
       icon: CalendarDays,
-      badge: 'Tez kunda',
+      href: '/doctors',
+      badge: 'Faol',
+      badgeVariant: 'success' as const,
     },
     {
       title: 'Mening qabullarim',
       description: 'Rejalashtirilgan va avvalgi barcha qabullaringiz ro‘yxatini bitta joyda boshqaring.',
       icon: CalendarCheck,
-      badge: 'Tez kunda',
+      href: '/appointments',
+      badge: 'Faol',
+      badgeVariant: 'success' as const,
     },
   ];
 
@@ -208,48 +227,147 @@ export function DashboardPage() {
           )}
         </div>
 
-        {/* Coming Soon Features Grid */}
+        {/* Upcoming Appointment Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-brand-navy">Kelgusi qabul</h2>
+              <p className="text-xs sm:text-sm text-brand-muted">
+                Yaqindagi rejalashtirilgan shifokor ko‘rigi
+              </p>
+            </div>
+            <Link href="/appointments">
+              <Button variant="outline" size="sm" rightIcon={<ArrowRight className="h-3.5 w-3.5" />}>
+                Barcha qabullar
+              </Button>
+            </Link>
+          </div>
+
+          {isLoadingAppointments ? (
+            <Card>
+              <CardContent className="p-6">
+                <Skeleton className="h-24 w-full rounded-2xl" />
+              </CardContent>
+            </Card>
+          ) : nextAppointment ? (
+            <Card className="border-blue-100 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/30 overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-blue text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm">
+                      <Stethoscope className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <AppointmentStatusBadge status={nextAppointment.status} size="sm" />
+                        <span className="text-xs font-bold text-brand-blue">
+                          {nextAppointment.doctor?.specialty || 'Shifokor'}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900">
+                        {nextAppointment.doctor
+                          ? `${nextAppointment.doctor.first_name} ${nextAppointment.doctor.last_name}`
+                          : 'Shifokor'}
+                      </h3>
+                      <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{nextAppointment.clinic?.name || 'Klinika'}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 gap-2">
+                    <div className="text-left sm:text-right">
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1 sm:justify-end">
+                        <Calendar className="w-3.5 h-3.5 text-brand-blue" />
+                        <span>{nextAppointment.appointment_date}</span>
+                      </div>
+                      <div className="text-sm font-mono font-extrabold text-brand-navy flex items-center gap-1 sm:justify-end mt-0.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <span>
+                          {nextAppointment.start_time} – {nextAppointment.end_time}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Link href={`/appointments/${nextAppointment.id}`} className="mt-2">
+                      <Button variant="primary" size="sm" rightIcon={<ArrowRight className="h-3 w-3" />}>
+                        Batafsil
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="p-8 text-center space-y-3">
+                <CalendarDays className="w-10 h-10 text-slate-300 mx-auto" />
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-800 text-sm">
+                    Siz hali qabulga yozilmagansiz
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    Klinikalar yoki mutaxassis shifokorlarni toping va o‘zingizga qulay vaqtga navbat oling.
+                  </p>
+                </div>
+                <div className="pt-1">
+                  <Link href="/doctors">
+                    <Button variant="primary" size="sm" rightIcon={<Search className="h-3.5 w-3.5" />}>
+                      Shifokor qidirish
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Quick Services Grid */}
         <div className="space-y-4">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-brand-navy">
-              Kelgusi xizmatlar va imkoniyatlar
+              QabulGo xizmatlari
             </h2>
             <p className="text-xs sm:text-sm text-brand-muted">
-              Ushbu bo‘limlar hozirda ishlab chiqilmoqda va tez orada taqdim etiladi
+              Platforma orqali foydalanishingiz mumkin bo‘lgan tezkor imkoniyatlar
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {upcomingFeatures.map((feature) => {
-              const Icon = feature.icon;
+            {quickServices.map((service) => {
+              const Icon = service.icon;
               return (
-                <Card
-                  key={feature.title}
-                  className="relative overflow-hidden border-dashed hover:border-solid hover:border-brand-blue/40 transition-all duration-200"
-                >
-                  <CardContent className="p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="p-3 rounded-2xl bg-slate-100 text-brand-navy shrink-0">
-                        <Icon className="h-6 w-6 text-brand-blue" />
+                <Link key={service.title} href={service.href} className="group block h-full">
+                  <Card className="h-full border hover:border-brand-blue/50 hover:shadow-subtle transition-all duration-200">
+                    <CardContent className="p-6 space-y-4 flex flex-col justify-between h-full">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="p-3 rounded-2xl bg-blue-50 text-brand-blue group-hover:bg-brand-blue group-hover:text-white transition-colors shrink-0">
+                            <Icon className="h-6 w-6" />
+                          </div>
+                          <Badge variant={service.badgeVariant} size="sm">
+                            {service.badge}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <h3 className="font-bold text-brand-navy text-base group-hover:text-brand-blue transition-colors">
+                            {service.title}
+                          </h3>
+                          <p className="text-xs text-brand-muted leading-relaxed">
+                            {service.description}
+                          </p>
+                        </div>
                       </div>
-                      <Badge variant="neutral" size="sm">
-                        {feature.badge}
-                      </Badge>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <h3 className="font-bold text-brand-navy text-base">{feature.title}</h3>
-                      <p className="text-xs text-brand-muted leading-relaxed">
-                        {feature.description}
-                      </p>
-                    </div>
-
-                    <div className="pt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-muted/70">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>2-bosqichda ishga tushadi</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="pt-2 flex items-center gap-1.5 text-xs font-bold text-brand-blue group-hover:underline">
+                        <span>O‘tish</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               );
             })}
           </div>

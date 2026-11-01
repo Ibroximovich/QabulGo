@@ -65,6 +65,7 @@ func main() {
 	auditRepo := repositories.NewAuditRepository(db)
 	publicSearchRepo := repositories.NewPublicSearchRepository(db)
 	scheduleRepo := repositories.NewScheduleRepository(db)
+	appointmentRepo := repositories.NewAppointmentRepository(db)
 
 	// 4. Services initsializatsiyasi
 	emailService := services.NewEmailService(cfg)
@@ -77,7 +78,8 @@ func main() {
 	specialtyService := services.NewSpecialtyService(specialtyRepo)
 	storageService := services.NewLocalStorageService("uploads", "/uploads")
 	publicSearchService := services.NewPublicSearchService(publicSearchRepo, doctorRepo)
-	scheduleService := services.NewScheduleService(scheduleRepo, clinicRepo, auditRepo)
+	scheduleService := services.NewScheduleService(scheduleRepo, clinicRepo, auditRepo, appointmentRepo)
+	appointmentService := services.NewAppointmentService(appointmentRepo, scheduleRepo, clinicRepo, auditRepo)
 
 	// Mutaxassisliklar boshlang'ich seed
 	_ = specialtyService.SeedIfEmpty(context.Background())
@@ -93,6 +95,7 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(storageService)
 	publicSearchHandler := handlers.NewPublicSearchHandler(publicSearchService)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
+	appointmentHandler := handlers.NewAppointmentHandler(appointmentService)
 
 	// 6. Router initsializatsiyasi
 	router := routes.SetupRouter(&routes.RouterConfig{
@@ -107,6 +110,7 @@ func main() {
 		UploadHandler:       uploadHandler,
 		PublicSearchHandler: publicSearchHandler,
 		ScheduleHandler:     scheduleHandler,
+		AppointmentHandler:  appointmentHandler,
 	})
 
 	// 7. HTTP Server sozlamalari

@@ -12,10 +12,16 @@ import {
   PlusCircle,
   Edit,
   ExternalLink,
+  Calendar,
+  CalendarCheck,
+  CheckCircle2,
+  ArrowRight,
 } from 'lucide-react';
 import { ClinicDetail } from '../types';
 import { Button } from '@/components/ui/Button';
 import { getMediaUrl } from '@/lib/utils/media';
+import { useClinicAppointments } from '@/features/appointments/hooks/useAppointments';
+import { AppointmentStatusBadge } from '@/features/appointments/components/AppointmentStatusBadge';
 
 interface ClinicContextType {
   clinic?: ClinicDetail;
@@ -35,6 +41,17 @@ const WEEKDAYS = [
 export function ClinicDashboardPage() {
   const { clinic, isLoadingClinic } = useClinicContext();
   const router = useRouter();
+
+  const todayStr = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const { data: todayAppointmentsData, isLoading: isLoadingAppointments } = useClinicAppointments(
+    clinic?.id || '',
+    { date: todayStr, limit: 5 },
+    Boolean(clinic?.id && clinic.status === 'approved')
+  );
+
+  const todayAppointments = todayAppointmentsData?.appointments || [];
+  const todayTotal = todayAppointmentsData?.total || 0;
 
   if (isLoadingClinic) {
     return (
@@ -135,11 +152,11 @@ export function ClinicDashboardPage() {
       </div>
 
       {/* Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Shifokorlar */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Shifokorlar bazasi</span>
+            <span className="text-xs font-semibold text-slate-500">Shifokorlar</span>
             <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0866F5] flex items-center justify-center">
               <Users className="w-5 h-5" />
             </div>
@@ -148,7 +165,7 @@ export function ClinicDashboardPage() {
             <span className="text-2xl font-extrabold text-slate-900">
               {clinic.doctors_count || 0}
             </span>
-            <span className="text-xs text-slate-500">nafar biriktirilgan</span>
+            <span className="text-xs text-slate-500">nafar</span>
           </div>
           <div className="mt-2 text-xs">
             {clinic.status === 'approved' ? (
@@ -164,6 +181,34 @@ export function ClinicDashboardPage() {
           </div>
         </div>
 
+        {/* Bugungi Qabullar */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">Bugungi qabullar</span>
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Calendar className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900">
+              {todayTotal}
+            </span>
+            <span className="text-xs text-slate-500">ta bron</span>
+          </div>
+          <div className="mt-2 text-xs">
+            {clinic.status === 'approved' ? (
+              <Link
+                href="/clinic/appointments"
+                className="text-[#0866F5] font-semibold hover:underline inline-flex items-center gap-1"
+              >
+                Bronlarni boshqarish <ExternalLink className="w-3 h-3" />
+              </Link>
+            ) : (
+              <span className="text-slate-400">Tasdiqlangach ko‘rinadi</span>
+            )}
+          </div>
+        </div>
+
         {/* Bugungi Ish vaqti */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
           <div className="flex items-center justify-between">
@@ -174,9 +219,9 @@ export function ClinicDashboardPage() {
           </div>
           <div className="mt-3">
             {todayWorkingHour?.is_closed ? (
-              <span className="text-base font-bold text-rose-600">Bugun dam olish kuni</span>
+              <span className="text-base font-bold text-rose-600">Dam olish kuni</span>
             ) : (
-              <div className="text-xl font-extrabold text-slate-900 font-mono">
+              <div className="text-base font-extrabold text-slate-900 font-mono">
                 {todayWorkingHour?.opening_time || '08:00'} —{' '}
                 {todayWorkingHour?.closing_time || '18:00'}
               </div>
@@ -190,12 +235,12 @@ export function ClinicDashboardPage() {
         {/* Bog'lanish */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Bog‘lanish vositalari</span>
+            <span className="text-xs font-semibold text-slate-500">Aloqa</span>
             <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
               <Phone className="w-5 h-5" />
             </div>
           </div>
-          <div className="mt-3 text-sm font-semibold text-slate-900">
+          <div className="mt-3 text-sm font-semibold text-slate-900 truncate">
             {clinic.phone}
           </div>
           <div className="mt-1 text-xs text-slate-500 truncate">
@@ -203,6 +248,80 @@ export function ClinicDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Bugungi Qabullar Jadvali */}
+      {clinic.status === 'approved' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <CalendarCheck className="w-4 h-4 text-brand-blue" />
+                <span>Bugungi qabullar</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Klinikada bugungi kun uchun tasdiqlangan qabullar ro‘yxati
+              </p>
+            </div>
+            <Link
+              href="/clinic/appointments"
+              className="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1"
+            >
+              <span>Barcha bronlar</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {todayAppointments.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              Bugungi kunga hozircha yangi bronlar mavjud emas.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 uppercase font-bold text-[10px]">
+                    <th className="py-2.5 px-3">Bemor</th>
+                    <th className="py-2.5 px-3">Shifokor</th>
+                    <th className="py-2.5 px-3">Vaqt</th>
+                    <th className="py-2.5 px-3">Holat</th>
+                    <th className="py-2.5 px-3 text-right">Amal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {todayAppointments.map((appt) => (
+                    <tr key={appt.id} className="hover:bg-slate-50/60">
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                        {appt.patient
+                          ? `${appt.patient.first_name} ${appt.patient.last_name}`
+                          : 'Bemor'}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {appt.doctor
+                          ? `${appt.doctor.first_name} ${appt.doctor.last_name}`
+                          : 'Shifokor'}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-bold">
+                        {appt.start_time} – {appt.end_time}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <AppointmentStatusBadge status={appt.status} size="sm" />
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <Link
+                          href={`/clinic/appointments/${appt.id}`}
+                          className="text-brand-blue font-bold hover:underline"
+                        >
+                          Batafsil
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Description & Details Section */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">

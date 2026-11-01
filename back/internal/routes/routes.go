@@ -24,6 +24,7 @@ type RouterConfig struct {
 	UploadHandler       *handlers.UploadHandler
 	PublicSearchHandler *handlers.PublicSearchHandler
 	ScheduleHandler     *handlers.ScheduleHandler
+	AppointmentHandler  *handlers.AppointmentHandler
 }
 
 // SetupRouter initializes and configures the Gin engine with all routes and middlewares
@@ -173,6 +174,30 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 				admin.POST("/clinics/:id/approve", rc.AdminHandler.ApproveClinic)
 				admin.POST("/clinics/:id/reject", rc.AdminHandler.RejectClinic)
 				admin.POST("/clinics/:id/suspend", rc.AdminHandler.SuspendClinic)
+			}
+		}
+
+		// 9. Appointment Booking Routes
+		if rc.AppointmentHandler != nil {
+			patientAppointments := v1.Group("/appointments")
+			patientAppointments.Use(middleware.Auth(rc.Config))
+			patientAppointments.Use(middleware.RequireRole(models.RolePatient))
+			{
+				patientAppointments.POST("", rc.AppointmentHandler.BookAppointment)
+				patientAppointments.GET("/my", rc.AppointmentHandler.GetMyAppointments)
+				patientAppointments.GET("/:id", rc.AppointmentHandler.GetMyAppointmentByID)
+				patientAppointments.POST("/:id/cancel", rc.AppointmentHandler.CancelMyAppointment)
+			}
+
+			clinicAppointments := v1.Group("/clinics/:id/appointments")
+			clinicAppointments.Use(middleware.Auth(rc.Config))
+			clinicAppointments.Use(middleware.RequireRole(models.RoleClinicOwner, models.RoleClinicAdmin, models.RoleSuperAdmin))
+			{
+				clinicAppointments.GET("", rc.AppointmentHandler.GetClinicAppointments)
+				clinicAppointments.GET("/:appointmentId", rc.AppointmentHandler.GetClinicAppointmentByID)
+				clinicAppointments.POST("/:appointmentId/cancel", rc.AppointmentHandler.CancelClinicAppointment)
+				clinicAppointments.POST("/:appointmentId/complete", rc.AppointmentHandler.CompleteClinicAppointment)
+				clinicAppointments.POST("/:appointmentId/no-show", rc.AppointmentHandler.NoShowClinicAppointment)
 			}
 		}
 

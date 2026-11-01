@@ -106,3 +106,13 @@ func GetCurrentUserID(c *gin.Context) (uuid.UUID, bool) {
 	id, ok := val.(uuid.UUID)
 	return id, ok
 }
+
+// GetCurrentUserRole extracts the authenticated user's Role from Gin Context
+func GetCurrentUserRole(c *gin.Context) (models.UserRole, bool) {
+	val, exists := c.Get(RoleContextKey)
+	if !exists {
+		return "", false
+	}
+	role, ok := val.(models.UserRole)
+	return role, ok
+}

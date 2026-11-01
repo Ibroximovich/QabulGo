@@ -1405,3 +1405,413 @@ func (m *MockScheduleRepository) GetAvailabilityData(
 	return &clinicCopy, cd, weekdaySlots, overrides, nil
 }
 
+// MockAppointmentRepository implements in-memory thread-safe AppointmentRepository
+type MockAppointmentRepository struct {
+	mu           sync.RWMutex
+	appointments map[uuid.UUID]*models.Appointment
+	userRepo     *MockUserRepository
+	clinicRepo   *MockClinicRepository
+	doctorRepo   *MockDoctorRepository
+}
+
+func NewMockAppointmentRepository(
+	userRepo *MockUserRepository,
+	clinicRepo *MockClinicRepository,
+	doctorRepo *MockDoctorRepository,
+) *MockAppointmentRepository {
+	return &MockAppointmentRepository{
+		appointments: make(map[uuid.UUID]*models.Appointment),
+		userRepo:     userRepo,
+		clinicRepo:   clinicRepo,
+		doctorRepo:   doctorRepo,
+	}
+}
+
+func (m *MockAppointmentRepository) Create(ctx context.Context, appt *models.Appointment) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// 1. Check doctor overlap on date
+	for _, existing := range m.appointments {
+		if existing.DoctorID == appt.DoctorID && existing.AppointmentDate == appt.AppointmentDate {
+			if existing.Status == models.AppointmentStatusConfirmed || existing.Status == models.AppointmentStatusCompleted {
+				if appt.StartTime < existing.EndTime && existing.StartTime < appt.EndTime {
+					return repositories.ErrDoubleBookingConflict
+				}
+			}
+		}
+	}
+
+	// 2. Check patient overlap on date
+	for _, existing := range m.appointments {
+		if existing.PatientID == appt.PatientID && existing.AppointmentDate == appt.AppointmentDate {
+			if existing.Status == models.AppointmentStatusConfirmed || existing.Status == models.AppointmentStatusCompleted {
+				if existing.StartTime == appt.StartTime {
+					return errors.New("siz allaqachon ushbu vaqtda boshqa qabulga yozilgansiz")
+				}
+			}
+		}
+	}
+
+	// 3. Check idempotency key uniqueness for patient
+	if appt.IdempotencyKey != nil && *appt.IdempotencyKey != "" {
+		for _, existing := range m.appointments {
+			if existing.PatientID == appt.PatientID && existing.IdempotencyKey != nil && *existing.IdempotencyKey == *appt.IdempotencyKey {
+				return repositories.ErrIdempotencyConflict
+			}
+		}
+	}
+
+	if appt.ID == uuid.Nil {
+		appt.ID = uuid.New()
+	}
+	appt.CreatedAt = time.Now()
+	appt.UpdatedAt = time.Now()
+
+	copyAppt := *appt
+	m.appointments[appt.ID] = &copyAppt
+	return nil
+}
+
+func (m *MockAppointmentRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Appointment, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	appt, ok := m.appointments[id]
+	if !ok {
+		return nil, repositories.ErrAppointmentNotFound
+	}
+	copyAppt := *appt
+
+	if m.userRepo != nil {
+		if u, exists := m.userRepo.users[copyAppt.PatientID]; exists {
+			uCopy := *u
+			copyAppt.Patient = &uCopy
+		}
+	}
+	if m.clinicRepo != nil {
+		if c, exists := m.clinicRepo.clinics[copyAppt.ClinicID]; exists {
+			cCopy := *c
+			copyAppt.Clinic = &cCopy
+		}
+	}
+	if m.doctorRepo != nil {
+		if d, exists := m.doctorRepo.doctors[copyAppt.DoctorID]; exists {
+			dCopy := *d
+			copyAppt.Doctor = &dCopy
+		}
+		if cd, exists := m.doctorRepo.clinicDoctors[copyAppt.ClinicDoctorID]; exists {
+			cdCopy := *cd
+			copyAppt.ClinicDoctor = &cdCopy
+		}
+	}
+
+	return &copyAppt, nil
+}
+
+func (m *MockAppointmentRepository) FindByIdempotencyKey(ctx context.Context, patientID uuid.UUID, key string) (*models.Appointment, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, appt := range m.appointments {
+		if appt.PatientID == patientID && appt.IdempotencyKey != nil && *appt.IdempotencyKey == key {
+			copyAppt := *appt
+			return &copyAppt, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *MockAppointmentRepository) CheckDoctorBookingOverlap(ctx context.Context, doctorID uuid.UUID, date, startTime, endTime string) (*models.Appointment, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, appt := range m.appointments {
+		if appt.DoctorID == doctorID && appt.AppointmentDate == date {
+			if appt.Status == models.AppointmentStatusConfirmed || appt.Status == models.AppointmentStatusCompleted {
+				if startTime < appt.EndTime && appt.StartTime < endTime {
+					copyAppt := *appt
+					return &copyAppt, nil
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+func (m *MockAppointmentRepository) ListForPatient(
+	ctx context.Context,
+	patientID uuid.UUID,
+	filter *dto.PatientAppointmentFilter,
+	todayDate, nowTime string,
+) ([]models.Appointment, int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var matched []models.Appointment
+	for _, appt := range m.appointments {
+		if appt.PatientID != patientID {
+			continue
+		}
+		if filter != nil {
+			if filter.Status != "" && string(appt.Status) != filter.Status {
+				continue
+			}
+			if filter.Timeframe == "upcoming" {
+				if appt.Status != models.AppointmentStatusConfirmed {
+					continue
+				}
+				if !(appt.AppointmentDate > todayDate || (appt.AppointmentDate == todayDate && appt.EndTime > nowTime)) {
+					continue
+				}
+			} else if filter.Timeframe == "past" {
+				isPastTime := appt.AppointmentDate < todayDate || (appt.AppointmentDate == todayDate && appt.EndTime <= nowTime)
+				isPastStatus := appt.Status == models.AppointmentStatusCompleted || appt.Status == models.AppointmentStatusNoShow
+				if !isPastTime && !isPastStatus {
+					continue
+				}
+			} else if filter.Timeframe == "cancelled" {
+				if appt.Status != models.AppointmentStatusCancelled {
+					continue
+				}
+			}
+		}
+
+		copyAppt := *appt
+		if m.clinicRepo != nil {
+			if c, exists := m.clinicRepo.clinics[copyAppt.ClinicID]; exists {
+				cCopy := *c
+				copyAppt.Clinic = &cCopy
+			}
+		}
+		if m.doctorRepo != nil {
+			if d, exists := m.doctorRepo.doctors[copyAppt.DoctorID]; exists {
+				dCopy := *d
+				copyAppt.Doctor = &dCopy
+			}
+			if cd, exists := m.doctorRepo.clinicDoctors[copyAppt.ClinicDoctorID]; exists {
+				cdCopy := *cd
+				copyAppt.ClinicDoctor = &cdCopy
+			}
+		}
+		matched = append(matched, copyAppt)
+	}
+
+	sort.Slice(matched, func(i, j int) bool {
+		if matched[i].AppointmentDate == matched[j].AppointmentDate {
+			return matched[i].StartTime > matched[j].StartTime
+		}
+		return matched[i].AppointmentDate > matched[j].AppointmentDate
+	})
+
+	total := int64(len(matched))
+	page := 1
+	limit := 10
+	if filter != nil {
+		if filter.Page > 0 {
+			page = filter.Page
+		}
+		if filter.Limit > 0 && filter.Limit <= 100 {
+			limit = filter.Limit
+		}
+	}
+	offset := (page - 1) * limit
+	if offset > len(matched) {
+		offset = len(matched)
+	}
+	end := offset + limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+
+	return matched[offset:end], total, nil
+}
+
+func (m *MockAppointmentRepository) ListForClinic(
+	ctx context.Context,
+	clinicID uuid.UUID,
+	filter *dto.ClinicAppointmentFilter,
+) ([]models.Appointment, int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var matched []models.Appointment
+	for _, appt := range m.appointments {
+		if appt.ClinicID != clinicID {
+			continue
+		}
+		if filter != nil {
+			if filter.Date != "" && appt.AppointmentDate != filter.Date {
+				continue
+			}
+			if filter.DateFrom != "" && appt.AppointmentDate < filter.DateFrom {
+				continue
+			}
+			if filter.DateTo != "" && appt.AppointmentDate > filter.DateTo {
+				continue
+			}
+			if filter.DoctorID != nil && *filter.DoctorID != uuid.Nil && appt.DoctorID != *filter.DoctorID {
+				continue
+			}
+			if filter.Status != "" && string(appt.Status) != filter.Status {
+				continue
+			}
+		}
+
+		copyAppt := *appt
+		if m.userRepo != nil {
+			if u, exists := m.userRepo.users[copyAppt.PatientID]; exists {
+				uCopy := *u
+				copyAppt.Patient = &uCopy
+			}
+		}
+		if m.doctorRepo != nil {
+			if d, exists := m.doctorRepo.doctors[copyAppt.DoctorID]; exists {
+				dCopy := *d
+				copyAppt.Doctor = &dCopy
+			}
+			if cd, exists := m.doctorRepo.clinicDoctors[copyAppt.ClinicDoctorID]; exists {
+				cdCopy := *cd
+				copyAppt.ClinicDoctor = &cdCopy
+			}
+		}
+		matched = append(matched, copyAppt)
+	}
+
+	sort.Slice(matched, func(i, j int) bool {
+		if matched[i].AppointmentDate == matched[j].AppointmentDate {
+			return matched[i].StartTime > matched[j].StartTime
+		}
+		return matched[i].AppointmentDate > matched[j].AppointmentDate
+	})
+
+	total := int64(len(matched))
+	page := 1
+	limit := 20
+	if filter != nil {
+		if filter.Page > 0 {
+			page = filter.Page
+		}
+		if filter.Limit > 0 && filter.Limit <= 100 {
+			limit = filter.Limit
+		}
+	}
+	offset := (page - 1) * limit
+	if offset > len(matched) {
+		offset = len(matched)
+	}
+	end := offset + limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+
+	return matched[offset:end], total, nil
+}
+
+func (m *MockAppointmentRepository) UpdateStatus(
+	ctx context.Context,
+	id uuid.UUID,
+	fromStatus, toStatus models.AppointmentStatus,
+	reason *string,
+	timestampField string,
+	timestamp time.Time,
+) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	appt, ok := m.appointments[id]
+	if !ok {
+		return repositories.ErrAppointmentNotFound
+	}
+	if appt.Status != fromStatus {
+		return repositories.ErrAppointmentNotEditable
+	}
+
+	appt.Status = toStatus
+	appt.UpdatedAt = time.Now()
+	if reason != nil {
+		appt.CancellationReason = reason
+	}
+	if timestampField == "cancelled_at" {
+		appt.CancelledAt = &timestamp
+	} else if timestampField == "completed_at" {
+		appt.CompletedAt = &timestamp
+	} else if timestampField == "no_show_at" {
+		appt.NoShowAt = &timestamp
+	}
+
+	return nil
+}
+
+func (m *MockAppointmentRepository) GetBookedSlotsForDoctor(ctx context.Context, doctorID uuid.UUID, date string) ([]models.Appointment, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []models.Appointment
+	for _, appt := range m.appointments {
+		if appt.DoctorID == doctorID && appt.AppointmentDate == date {
+			if appt.Status == models.AppointmentStatusConfirmed || appt.Status == models.AppointmentStatusCompleted {
+				result = append(result, *appt)
+			}
+		}
+	}
+	return result, nil
+}
+
+func (m *MockAppointmentRepository) FindFutureConfirmedAppointmentsForDoctor(
+	ctx context.Context,
+	clinicDoctorID uuid.UUID,
+	fromDate string,
+) ([]models.Appointment, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []models.Appointment
+	for _, appt := range m.appointments {
+		if appt.ClinicDoctorID == clinicDoctorID && appt.Status == models.AppointmentStatusConfirmed {
+			if appt.AppointmentDate >= fromDate {
+				copyAppt := *appt
+				if m.userRepo != nil {
+					if u, exists := m.userRepo.users[copyAppt.PatientID]; exists {
+						uCopy := *u
+						copyAppt.Patient = &uCopy
+					}
+				}
+				result = append(result, copyAppt)
+			}
+		}
+	}
+	return result, nil
+}
+
+func (m *MockAppointmentRepository) FindFutureConfirmedAppointmentsOnDate(
+	ctx context.Context,
+	clinicDoctorID uuid.UUID,
+	date string,
+	startTime, endTime *string,
+) ([]models.Appointment, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []models.Appointment
+	for _, appt := range m.appointments {
+		if appt.ClinicDoctorID == clinicDoctorID && appt.Status == models.AppointmentStatusConfirmed && appt.AppointmentDate == date {
+			if startTime != nil && endTime != nil {
+				if !(appt.StartTime < *endTime && *startTime < appt.EndTime) {
+					continue
+				}
+			}
+			copyAppt := *appt
+			if m.userRepo != nil {
+				if u, exists := m.userRepo.users[copyAppt.PatientID]; exists {
+					uCopy := *u
+					copyAppt.Patient = &uCopy
+				}
+			}
+			result = append(result, copyAppt)
+		}
+	}
+	return result, nil
+}
+
+

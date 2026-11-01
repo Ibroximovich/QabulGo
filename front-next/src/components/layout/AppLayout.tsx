@@ -67,15 +67,15 @@ export function AppLayout({ children }: AppLayoutProps) {
     },
     {
       name: 'Qabulga yozilish',
-      href: '#',
+      href: '/doctors',
       icon: CalendarDays,
-      isAvailable: false,
+      isAvailable: true,
     },
     {
       name: 'Mening qabullarim',
-      href: '#',
+      href: '/appointments',
       icon: CalendarCheck,
-      isAvailable: false,
+      isAvailable: true,
     },
   ];
 

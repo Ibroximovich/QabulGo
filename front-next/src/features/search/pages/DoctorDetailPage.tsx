@@ -174,6 +174,8 @@ export function DoctorDetailPage({ initialDoctor }: DoctorDetailPageProps) {
         {/* Doctor Booking & Availability Calendar */}
         <DoctorBookingCalendar
           doctorId={doctor.doctor_id}
+          doctorName={`${doctor.first_name} ${doctor.last_name}`}
+          specialtyName={doctor.primary_specialty?.name}
           workplaces={doctor.workplaces}
         />
 
