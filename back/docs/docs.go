@@ -65,7 +65,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
@@ -73,7 +73,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicSummaryDTO"
+                                                "$ref": "#/definitions/dto.ClinicSummaryDTO"
                                             }
                                         }
                                     }
@@ -114,13 +114,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO"
+                                            "$ref": "#/definitions/dto.ClinicDetailDTO"
                                         }
                                     }
                                 }
@@ -158,7 +158,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Klinika muvaffaqiyatli tasdiqlandi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     }
                 }
@@ -196,7 +196,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.AdminReviewClinicRequest"
+                            "$ref": "#/definitions/dto.AdminReviewClinicRequest"
                         }
                     }
                 ],
@@ -204,7 +204,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Klinika rad etildi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     }
                 }
@@ -242,7 +242,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.AdminReviewClinicRequest"
+                            "$ref": "#/definitions/dto.AdminReviewClinicRequest"
                         }
                     }
                 ],
@@ -250,7 +250,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Klinika bloklandi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     }
                 }
@@ -276,7 +276,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuperAdminLoginRequest"
+                            "$ref": "#/definitions/dto.SuperAdminLoginRequest"
                         }
                     }
                 ],
@@ -286,13 +286,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.LoginData"
+                                            "$ref": "#/definitions/dto.LoginData"
                                         }
                                     }
                                 }
@@ -302,13 +302,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Email yoki parol noto‘g‘ri",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Ruxsat berilmagan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -334,7 +334,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicLoginRequest"
+                            "$ref": "#/definitions/dto.ClinicLoginRequest"
                         }
                     }
                 ],
@@ -344,13 +344,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.LoginData"
+                                            "$ref": "#/definitions/dto.LoginData"
                                         }
                                     }
                                 }
@@ -360,13 +360,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Email yoki parol noto‘g‘ri",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Email tasdiqlanmagan yoki ruxsat yo‘q",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -392,7 +392,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicRegisterRequest"
+                            "$ref": "#/definitions/dto.ClinicRegisterRequest"
                         }
                     }
                 ],
@@ -402,13 +402,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.PatientRegisterData"
+                                            "$ref": "#/definitions/dto.PatientRegisterData"
                                         }
                                     }
                                 }
@@ -418,19 +418,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Noto‘g‘ri ma’lumot kiritilgan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Email yoki telefon allaqachon mavjud",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Validatsiya xatoligi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -456,7 +456,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ForgotPasswordRequest"
+                            "$ref": "#/definitions/dto.ForgotPasswordRequest"
                         }
                     }
                 ],
@@ -464,7 +464,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Tiklash kodi yuborildi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     }
                 }
@@ -484,7 +484,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Muvaffaqiyatli chiqildi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     }
                 }
@@ -510,7 +510,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.PatientLoginRequest"
+                            "$ref": "#/definitions/dto.PatientLoginRequest"
                         }
                     }
                 ],
@@ -520,13 +520,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.LoginData"
+                                            "$ref": "#/definitions/dto.LoginData"
                                         }
                                     }
                                 }
@@ -536,13 +536,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Email yoki parol noto‘g‘ri",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Email tasdiqlanmagan yoki akkaunt bloklangan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -568,7 +568,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.PatientRegisterRequest"
+                            "$ref": "#/definitions/dto.PatientRegisterRequest"
                         }
                     }
                 ],
@@ -578,13 +578,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.PatientRegisterData"
+                                            "$ref": "#/definitions/dto.PatientRegisterData"
                                         }
                                     }
                                 }
@@ -594,19 +594,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Noto‘g‘ri ma’lumot kiritilgan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Email yoki telefon allaqachon mavjud",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Validatsiya xatoligi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -626,13 +626,13 @@ const docTemplate = `{
                     "200": {
                         "description": "Token yangilandi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Yaroqsiz yoki muddati tugagan refresh token",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -658,7 +658,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ResendVerificationRequest"
+                            "$ref": "#/definitions/dto.ResendVerificationRequest"
                         }
                     }
                 ],
@@ -666,13 +666,13 @@ const docTemplate = `{
                     "200": {
                         "description": "Kod qayta yuborildi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Xatolik",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -698,7 +698,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ResetPasswordRequest"
+                            "$ref": "#/definitions/dto.ResetPasswordRequest"
                         }
                     }
                 ],
@@ -706,13 +706,13 @@ const docTemplate = `{
                     "200": {
                         "description": "Parol muvaffaqiyatli o‘zgartirildi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Kod yoki parol noto‘g‘ri",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -738,7 +738,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.VerifyEmailRequest"
+                            "$ref": "#/definitions/dto.VerifyEmailRequest"
                         }
                     }
                 ],
@@ -748,13 +748,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.LoginData"
+                                            "$ref": "#/definitions/dto.LoginData"
                                         }
                                     }
                                 }
@@ -764,13 +764,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Kod noto‘g‘ri yoki muddati tugagan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "429": {
                         "description": "Ko‘p noto‘g‘ri urinish",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -801,7 +801,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.CreateClinicRequest"
+                            "$ref": "#/definitions/dto.CreateClinicRequest"
                         }
                     }
                 ],
@@ -811,13 +811,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO"
+                                            "$ref": "#/definitions/dto.ClinicDetailDTO"
                                         }
                                     }
                                 }
@@ -827,19 +827,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Validatsiya xatoligi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Avtorizatsiya talab qilinadi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Siz allaqachon klinika yaratgansiz",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -866,13 +866,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO"
+                                            "$ref": "#/definitions/dto.ClinicDetailDTO"
                                         }
                                     }
                                 }
@@ -882,13 +882,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Avtorizatsiya talab qilinadi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Klinika topilmadi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -919,13 +919,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO"
+                                            "$ref": "#/definitions/dto.ClinicDetailDTO"
                                         }
                                     }
                                 }
@@ -935,7 +935,7 @@ const docTemplate = `{
                     "404": {
                         "description": "Klinika topilmadi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -971,7 +971,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.UpdateClinicRequest"
+                            "$ref": "#/definitions/dto.UpdateClinicRequest"
                         }
                     }
                 ],
@@ -981,13 +981,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO"
+                                            "$ref": "#/definitions/dto.ClinicDetailDTO"
                                         }
                                     }
                                 }
@@ -997,19 +997,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Xatolik",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Ruxsat yo‘q",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Klinika topilmadi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1070,7 +1070,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1078,7 +1078,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO"
+                                                "$ref": "#/definitions/dto.ClinicDoctorItemDTO"
                                             }
                                         }
                                     }
@@ -1119,7 +1119,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.CreateDoctorRequest"
+                            "$ref": "#/definitions/dto.CreateDoctorRequest"
                         }
                     }
                 ],
@@ -1129,13 +1129,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO"
+                                            "$ref": "#/definitions/dto.ClinicDoctorItemDTO"
                                         }
                                     }
                                 }
@@ -1145,13 +1145,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Validatsiya xatoligi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Ruxsat yo‘q",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1189,13 +1189,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO"
+                                            "$ref": "#/definitions/dto.ClinicDoctorItemDTO"
                                         }
                                     }
                                 }
@@ -1205,7 +1205,7 @@ const docTemplate = `{
                     "404": {
                         "description": "Shifokor topilmadi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1244,13 +1244,13 @@ const docTemplate = `{
                     "200": {
                         "description": "Shifokor o‘chirildi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     },
                     "403": {
                         "description": "Ruxsat yo‘q",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1293,7 +1293,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.UpdateDoctorRequest"
+                            "$ref": "#/definitions/dto.UpdateDoctorRequest"
                         }
                     }
                 ],
@@ -1303,13 +1303,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO"
+                                            "$ref": "#/definitions/dto.ClinicDoctorItemDTO"
                                         }
                                     }
                                 }
@@ -1319,7 +1319,7 @@ const docTemplate = `{
                     "403": {
                         "description": "Ruxsat yo‘q",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1355,13 +1355,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO"
+                                            "$ref": "#/definitions/dto.ClinicDetailDTO"
                                         }
                                     }
                                 }
@@ -1371,13 +1371,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Yetarli ma’lumot to‘ldirilmagan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Ruxsat yo‘q",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1404,13 +1404,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.PatientProfileResponse"
+                                            "$ref": "#/definitions/dto.PatientProfileResponse"
                                         }
                                     }
                                 }
@@ -1420,19 +1420,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Avtorizatsiyadan o‘tilmagan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Ruxsat berilmagan rol",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Foydalanuvchi topilmadi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1461,7 +1461,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.UpdatePatientProfileRequest"
+                            "$ref": "#/definitions/dto.UpdatePatientProfileRequest"
                         }
                     }
                 ],
@@ -1471,13 +1471,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.PatientProfileResponse"
+                                            "$ref": "#/definitions/dto.PatientProfileResponse"
                                         }
                                     }
                                 }
@@ -1487,19 +1487,491 @@ const docTemplate = `{
                     "400": {
                         "description": "Validatsiya xatoligi",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Avtorizatsiyadan o‘tilmagan",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Telefon raqami allaqachon mavjud",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/clinics": {
+            "get": {
+                "description": "Nomi, manzili, viloyat, tuman va mutaxassislik bo‘yicha ommaviy qidiruv. Faqat tasdiqlangan (approved) klinikalar qaytariladi.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Bemorlar uchun tasdiqlangan klinikalarni qidirish va filtrlash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika nomi, manzili yoki tavsifi bo‘yicha qidiruv",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Viloyat (masalan: Toshkent shahri)",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tuman / Shahar (masalan: Yunusobod tumani)",
+                        "name": "district",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Mutaxassislik ID (UUID)",
+                        "name": "specialty_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Sahifa raqami (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Sahifadagi elementlar soni (default 12, max 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Klinikalar ro‘yxati",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.PublicClinicItemDTO"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Parametrlar xatosi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server xatosi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/clinics/nearby": {
+            "get": {
+                "description": "Berilgan latitude va longitude koordinatalari atrofidagi klinikalarni Haversine formulasi bo‘yicha masofasi (km) bilan tartiblab qaytaradi.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Bemor lokatsiyasiga eng yaqin tasdiqlangan klinikalarni topish",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Bemor kenglik koordinatasi (-90 .. 90)",
+                        "name": "latitude",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "Bemor uzunlik koordinatasi (-180 .. 180)",
+                        "name": "longitude",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "Qidiruv radiusi kilometrda (default 10 km, max 100 km)",
+                        "name": "radius_km",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Mutaxassislik bo‘yicha filtr (UUID)",
+                        "name": "specialty_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Sahifa raqami (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Sahifadagi elementlar soni (default 12, max 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Eng yaqin klinikalar ro‘yxati",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.NearbyClinicItemDTO"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Noto‘g‘ri koordinata yoki parametrlar",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server xatosi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/clinics/{id}": {
+            "get": {
+                "description": "Klinika ma’lumotlari, ish soatlari, mutaxassisliklari va faol shifokorlari",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Tasdiqlangan klinikaning to‘liq ommaviy profili",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Klinika tafsilotlari",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.ClinicDetailDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Klinika ID formati noto‘g‘ri",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Klinika topilmadi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/clinics/{id}/doctors": {
+            "get": {
+                "description": "Klinika shifokorlari, ularning mutaxassisliklari va narxlari",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Tasdiqlangan klinikaning barcha faol shifokorlari",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Klinika UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Klinika shifokorlari",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.ClinicDoctorItemDTO"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Klinika ID formati noto‘g‘ri",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Klinika topilmadi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/doctors": {
+            "get": {
+                "description": "Ism, familiya, mutaxassislik, hudud, narx oralig‘i bo‘yicha qidirish va saralash",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Shifokorlarni ommaviy qidirish va filtrlash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shifokor ismi, familiyasi yoki tavsifi",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Viloyat",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tuman",
+                        "name": "district",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Mutaxassislik ID",
+                        "name": "specialty_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Muayyan klinika ID",
+                        "name": "clinic_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Minimal narx (so‘m)",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Maksimal narx (so‘m)",
+                        "name": "max_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Saralash (price_asc, price_desc, experience_desc, name_asc)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Sahifa (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Miqdor (default 12, max 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Shifokorlar ro‘yxati",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.PublicDoctorItemDTO"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Server xatosi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/doctors/{id}": {
+            "get": {
+                "description": "Shifokor ma’lumotlari va u qabul qiladigan barcha tasdiqlangan klinikalar hamda narxlari",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Shifokorning batafsil profili va ish joylari",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shifokor UUID yoki ClinicDoctor UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Shifokor tafsilotlari",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.PublicDoctorDetailDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "ID formati noto‘g‘ri",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Shifokor topilmadi",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/regions": {
+            "get": {
+                "description": "Tasdiqlangan klinikalar mavjud bo‘lgan hududlar ro‘yxati",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Search"
+                ],
+                "summary": "Klinika mavjud hududlar (viloyatlar va tumanlar) katalogi",
+                "responses": {
+                    "200": {
+                        "description": "Hududlar katalogi",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.RegionItemDTO"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1521,7 +1993,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1529,7 +2001,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/qabulgo-backend_internal_dto.SpecialtyDTO"
+                                                "$ref": "#/definitions/dto.SpecialtyDTO"
                                             }
                                         }
                                     }
@@ -1579,13 +2051,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                                    "$ref": "#/definitions/dto.SuccessResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/qabulgo-backend_internal_dto.UploadResponse"
+                                            "$ref": "#/definitions/dto.UploadResponse"
                                         }
                                     }
                                 }
@@ -1595,7 +2067,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Fayl formati noto‘g‘ri yoki hajm katta",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1615,7 +2087,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/qabulgo-backend_internal_dto.SuccessResponse"
+                            "$ref": "#/definitions/dto.SuccessResponse"
                         }
                     }
                 }
@@ -1623,7 +2095,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "qabulgo-backend_internal_dto.AdminReviewClinicRequest": {
+        "dto.AdminReviewClinicRequest": {
             "type": "object",
             "properties": {
                 "reason": {
@@ -1632,7 +2104,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ClinicDetailDTO": {
+        "dto.ClinicDetailDTO": {
             "type": "object",
             "properties": {
                 "address": {
@@ -1653,7 +2125,7 @@ const docTemplate = `{
                 "doctors": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO"
+                        "$ref": "#/definitions/dto.ClinicDoctorItemDTO"
                     }
                 },
                 "doctors_count": {
@@ -1665,8 +2137,17 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "latitude": {
+                    "type": "number"
+                },
+                "location_url": {
+                    "type": "string"
+                },
                 "logo_url": {
                     "type": "string"
+                },
+                "longitude": {
+                    "type": "number"
                 },
                 "name": {
                     "type": "string"
@@ -1683,6 +2164,12 @@ const docTemplate = `{
                 "rejection_reason": {
                     "type": "string"
                 },
+                "specialties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SpecialtyDTO"
+                    }
+                },
                 "status": {
                     "type": "string"
                 },
@@ -1692,12 +2179,12 @@ const docTemplate = `{
                 "working_hours": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/qabulgo-backend_internal_dto.WorkingHourItem"
+                        "$ref": "#/definitions/dto.WorkingHourItem"
                     }
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ClinicDoctorItemDTO": {
+        "dto.ClinicDoctorItemDTO": {
             "type": "object",
             "properties": {
                 "appointment_duration_minutes": {
@@ -1738,14 +2225,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "specialty": {
-                    "$ref": "#/definitions/qabulgo-backend_internal_dto.SpecialtyDTO"
+                    "$ref": "#/definitions/dto.SpecialtyDTO"
                 },
                 "updated_at": {
                     "type": "string"
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ClinicLoginRequest": {
+        "dto.ClinicLoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -1762,7 +2249,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ClinicRegisterRequest": {
+        "dto.ClinicRegisterRequest": {
             "type": "object",
             "required": [
                 "confirm_password",
@@ -1803,7 +2290,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ClinicSummaryDTO": {
+        "dto.ClinicSummaryDTO": {
             "type": "object",
             "properties": {
                 "address": {
@@ -1827,8 +2314,17 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "latitude": {
+                    "type": "number"
+                },
+                "location_url": {
+                    "type": "string"
+                },
                 "logo_url": {
                     "type": "string"
+                },
+                "longitude": {
+                    "type": "number"
                 },
                 "name": {
                     "type": "string"
@@ -1844,7 +2340,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.CreateClinicRequest": {
+        "dto.CreateClinicRequest": {
             "type": "object",
             "required": [
                 "address",
@@ -1874,9 +2370,21 @@ const docTemplate = `{
                     "type": "string",
                     "example": "info@shifonur.uz"
                 },
+                "latitude": {
+                    "type": "number",
+                    "example": 41.311081
+                },
+                "location_url": {
+                    "type": "string",
+                    "example": "https://maps.app.goo.gl/xyz"
+                },
                 "logo_url": {
                     "type": "string",
                     "example": "/uploads/clinics/logo-123.jpg"
+                },
+                "longitude": {
+                    "type": "number",
+                    "example": 69.240562
                 },
                 "name": {
                     "type": "string",
@@ -1893,12 +2401,12 @@ const docTemplate = `{
                 "working_hours": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/qabulgo-backend_internal_dto.WorkingHourItem"
+                        "$ref": "#/definitions/dto.WorkingHourItem"
                     }
                 }
             }
         },
-        "qabulgo-backend_internal_dto.CreateDoctorRequest": {
+        "dto.CreateDoctorRequest": {
             "type": "object",
             "required": [
                 "appointment_duration_minutes",
@@ -1951,7 +2459,54 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ErrorResponse": {
+        "dto.DoctorClinicWorkplaceDTO": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "appointment_duration_minutes": {
+                    "type": "integer"
+                },
+                "clinic_doctor_id": {
+                    "type": "string"
+                },
+                "clinic_id": {
+                    "type": "string"
+                },
+                "clinic_name": {
+                    "type": "string"
+                },
+                "consultation_price": {
+                    "type": "number"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "location_url": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "specialty": {
+                    "$ref": "#/definitions/dto.SpecialtyDTO"
+                }
+            }
+        },
+        "dto.ErrorResponse": {
             "type": "object",
             "properties": {
                 "errors": {
@@ -1970,7 +2525,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ForgotPasswordRequest": {
+        "dto.ForgotPasswordRequest": {
             "type": "object",
             "required": [
                 "email"
@@ -1982,7 +2537,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.LoginData": {
+        "dto.LoginData": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -1999,11 +2554,68 @@ const docTemplate = `{
                     "example": "Bearer"
                 },
                 "user": {
-                    "$ref": "#/definitions/qabulgo-backend_internal_dto.UserSummary"
+                    "$ref": "#/definitions/dto.UserSummary"
                 }
             }
         },
-        "qabulgo-backend_internal_dto.PatientLoginRequest": {
+        "dto.NearbyClinicItemDTO": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "distance_km": {
+                    "description": "To'g'ri chiziq bo'yicha masofa (km)",
+                    "type": "number"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "doctors_count": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "location_url": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "specialties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SpecialtyDTO"
+                    }
+                }
+            }
+        },
+        "dto.PatientLoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -2020,7 +2632,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.PatientProfileResponse": {
+        "dto.PatientProfileResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -2057,7 +2669,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.PatientRegisterData": {
+        "dto.PatientRegisterData": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -2090,7 +2702,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.PatientRegisterRequest": {
+        "dto.PatientRegisterRequest": {
             "type": "object",
             "required": [
                 "confirm_password",
@@ -2131,7 +2743,189 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ResendVerificationRequest": {
+        "dto.PublicClinicItemDTO": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "doctors_count": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "location_url": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "specialties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SpecialtyDTO"
+                    }
+                },
+                "working_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WorkingHourItem"
+                    }
+                }
+            }
+        },
+        "dto.PublicDoctorClinicDTO": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "location_url": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PublicDoctorDetailDTO": {
+            "type": "object",
+            "properties": {
+                "bio": {
+                    "type": "string"
+                },
+                "doctor_id": {
+                    "type": "string"
+                },
+                "experience_years": {
+                    "type": "integer"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "photo_url": {
+                    "type": "string"
+                },
+                "primary_specialty": {
+                    "$ref": "#/definitions/dto.SpecialtyDTO"
+                },
+                "workplaces": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.DoctorClinicWorkplaceDTO"
+                    }
+                }
+            }
+        },
+        "dto.PublicDoctorItemDTO": {
+            "type": "object",
+            "properties": {
+                "appointment_duration_minutes": {
+                    "type": "integer"
+                },
+                "bio": {
+                    "type": "string"
+                },
+                "clinic": {
+                    "$ref": "#/definitions/dto.PublicDoctorClinicDTO"
+                },
+                "clinic_doctor_id": {
+                    "description": "clinic_doctor row ID",
+                    "type": "string"
+                },
+                "consultation_price": {
+                    "type": "number"
+                },
+                "doctor_id": {
+                    "type": "string"
+                },
+                "experience_years": {
+                    "type": "integer"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "photo_url": {
+                    "type": "string"
+                },
+                "specialty": {
+                    "$ref": "#/definitions/dto.SpecialtyDTO"
+                }
+            }
+        },
+        "dto.RegionItemDTO": {
+            "type": "object",
+            "properties": {
+                "districts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "region": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ResendVerificationRequest": {
             "type": "object",
             "required": [
                 "email"
@@ -2143,7 +2937,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.ResetPasswordRequest": {
+        "dto.ResetPasswordRequest": {
             "type": "object",
             "required": [
                 "code",
@@ -2170,7 +2964,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.SpecialtyDTO": {
+        "dto.SpecialtyDTO": {
             "type": "object",
             "properties": {
                 "icon_url": {
@@ -2187,7 +2981,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.SuccessResponse": {
+        "dto.SuccessResponse": {
             "type": "object",
             "properties": {
                 "data": {},
@@ -2201,7 +2995,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.SuperAdminLoginRequest": {
+        "dto.SuperAdminLoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -2218,7 +3012,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.UpdateClinicRequest": {
+        "dto.UpdateClinicRequest": {
             "type": "object",
             "properties": {
                 "address": {
@@ -2237,8 +3031,20 @@ const docTemplate = `{
                 "email": {
                     "type": "string"
                 },
+                "latitude": {
+                    "type": "number",
+                    "example": 41.311081
+                },
+                "location_url": {
+                    "type": "string",
+                    "example": "https://maps.app.goo.gl/xyz"
+                },
                 "logo_url": {
                     "type": "string"
+                },
+                "longitude": {
+                    "type": "number",
+                    "example": 69.240562
                 },
                 "name": {
                     "type": "string",
@@ -2255,12 +3061,12 @@ const docTemplate = `{
                 "working_hours": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/qabulgo-backend_internal_dto.WorkingHourItem"
+                        "$ref": "#/definitions/dto.WorkingHourItem"
                     }
                 }
             }
         },
-        "qabulgo-backend_internal_dto.UpdateDoctorRequest": {
+        "dto.UpdateDoctorRequest": {
             "type": "object",
             "properties": {
                 "appointment_duration_minutes": {
@@ -2294,7 +3100,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.UpdatePatientProfileRequest": {
+        "dto.UpdatePatientProfileRequest": {
             "type": "object",
             "required": [
                 "first_name",
@@ -2316,7 +3122,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.UploadResponse": {
+        "dto.UploadResponse": {
             "type": "object",
             "properties": {
                 "filename": {
@@ -2337,7 +3143,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.UserSummary": {
+        "dto.UserSummary": {
             "type": "object",
             "properties": {
                 "email": {
@@ -2366,7 +3172,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.VerifyEmailRequest": {
+        "dto.VerifyEmailRequest": {
             "type": "object",
             "required": [
                 "code",
@@ -2383,7 +3189,7 @@ const docTemplate = `{
                 }
             }
         },
-        "qabulgo-backend_internal_dto.WorkingHourItem": {
+        "dto.WorkingHourItem": {
             "type": "object",
             "required": [
                 "weekday"

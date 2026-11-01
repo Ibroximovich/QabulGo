@@ -97,6 +97,22 @@ func (s *clinicService) CreateClinic(ctx context.Context, ownerID uuid.UUID, req
 	}
 
 	// 4. Model yaratish
+	// 4. Koordinatalarni tekshirish (agar kiritilgan bo'lsa)
+	var lat, lon *float64
+	if req.Latitude != nil || req.Longitude != nil {
+		if req.Latitude == nil || req.Longitude == nil {
+			return nil, errors.New("kenglik (latitude) va uzunlik (longitude) ikkalasi birga kiritilishi shart")
+		}
+		if *req.Latitude < -90 || *req.Latitude > 90 {
+			return nil, errors.New("kenglik (latitude) -90 va 90 oralig'ida bo'lishi kerak")
+		}
+		if *req.Longitude < -180 || *req.Longitude > 180 {
+			return nil, errors.New("uzunlik (longitude) -180 va 180 oralig'ida bo'lishi kerak")
+		}
+		lat = req.Latitude
+		lon = req.Longitude
+	}
+
 	clinic := &models.Clinic{
 		ID:            uuid.New(),
 		Name:          name,
@@ -107,6 +123,8 @@ func (s *clinicService) CreateClinic(ctx context.Context, ownerID uuid.UUID, req
 		District:      district,
 		Address:       address,
 		LocationURL:   strings.TrimSpace(req.LocationURL),
+		Latitude:      lat,
+		Longitude:     lon,
 		LogoURL:       req.LogoURL,
 		CoverImageURL: req.CoverImageURL,
 		Status:        models.ClinicStatusDraft,
@@ -207,6 +225,19 @@ func (s *clinicService) UpdateClinic(ctx context.Context, clinicID, userID uuid.
 	}
 	if req.LocationURL != nil {
 		clinic.LocationURL = strings.TrimSpace(*req.LocationURL)
+	}
+	if req.Latitude != nil || req.Longitude != nil {
+		if req.Latitude == nil || req.Longitude == nil {
+			return nil, errors.New("kenglik (latitude) va uzunlik (longitude) ikkalasi birga kiritilishi shart")
+		}
+		if *req.Latitude < -90 || *req.Latitude > 90 {
+			return nil, errors.New("kenglik (latitude) -90 va 90 oralig'ida bo'lishi kerak")
+		}
+		if *req.Longitude < -180 || *req.Longitude > 180 {
+			return nil, errors.New("uzunlik (longitude) -180 va 180 oralig'ida bo'lishi kerak")
+		}
+		clinic.Latitude = req.Latitude
+		clinic.Longitude = req.Longitude
 	}
 	if req.LogoURL != nil {
 		clinic.LogoURL = *req.LogoURL
@@ -329,6 +360,8 @@ func (s *clinicService) buildClinicDetailDTO(ctx context.Context, clinic *models
 		District:        clinic.District,
 		Address:         clinic.Address,
 		LocationURL:     clinic.LocationURL,
+		Latitude:        clinic.Latitude,
+		Longitude:       clinic.Longitude,
 		LogoURL:         clinic.LogoURL,
 		CoverImageURL:   clinic.CoverImageURL,
 		Status:          string(clinic.Status),

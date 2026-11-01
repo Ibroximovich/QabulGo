@@ -35,6 +35,8 @@ type Clinic struct {
 	District        string       `gorm:"type:varchar(100);not null" json:"district"`
 	Address         string       `gorm:"type:varchar(255);not null" json:"address"`
 	LocationURL     string       `gorm:"type:varchar(500)" json:"location_url"`
+	Latitude        *float64     `gorm:"type:double precision" json:"latitude,omitempty"`
+	Longitude       *float64     `gorm:"type:double precision" json:"longitude,omitempty"`
 	LogoURL         string       `gorm:"type:varchar(500)" json:"logo_url"`
 	CoverImageURL   string       `gorm:"type:varchar(500)" json:"cover_image_url"`
 	Status          ClinicStatus `gorm:"type:varchar(20);not null;default:'draft'" json:"status"`

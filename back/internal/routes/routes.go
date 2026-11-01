@@ -20,8 +20,9 @@ type RouterConfig struct {
 	ClinicHandler    *handlers.ClinicHandler
 	DoctorHandler    *handlers.DoctorHandler
 	AdminHandler     *handlers.AdminHandler
-	SpecialtyHandler *handlers.SpecialtyHandler
-	UploadHandler    *handlers.UploadHandler
+	SpecialtyHandler    *handlers.SpecialtyHandler
+	UploadHandler       *handlers.UploadHandler
+	PublicSearchHandler *handlers.PublicSearchHandler
 }
 
 // SetupRouter initializes and configures the Gin engine with all routes and middlewares
@@ -155,6 +156,26 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 				admin.POST("/clinics/:id/approve", rc.AdminHandler.ApproveClinic)
 				admin.POST("/clinics/:id/reject", rc.AdminHandler.RejectClinic)
 				admin.POST("/clinics/:id/suspend", rc.AdminHandler.SuspendClinic)
+			}
+		}
+
+		// 8. Public Search & Geolocation Routes (Public / Unauthenticated)
+		if rc.PublicSearchHandler != nil {
+			public := v1.Group("/public")
+			{
+				// Clinics
+				// MUHIM: /clinics/nearby static route parametrli /clinics/:id dan oldin ro'yxatdan o'tishi shart!
+				public.GET("/clinics/nearby", rc.PublicSearchHandler.SearchNearbyClinics)
+				public.GET("/clinics", rc.PublicSearchHandler.SearchClinics)
+				public.GET("/clinics/:id", rc.PublicSearchHandler.GetClinicDetails)
+				public.GET("/clinics/:id/doctors", rc.PublicSearchHandler.GetClinicDoctors)
+
+				// Doctors
+				public.GET("/doctors", rc.PublicSearchHandler.SearchDoctors)
+				public.GET("/doctors/:id", rc.PublicSearchHandler.GetDoctorDetails)
+
+				// Regions catalog
+				public.GET("/regions", rc.PublicSearchHandler.GetRegionsCatalog)
 			}
 		}
 	}

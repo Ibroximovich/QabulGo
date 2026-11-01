@@ -47,6 +47,8 @@ type CreateClinicRequest struct {
 	District      string            `json:"district" binding:"required" example:"Yunusobod tumani"`
 	Address       string            `json:"address" binding:"required" example:"Amir Temur ko'chasi, 45-uy"`
 	LocationURL   string            `json:"location_url,omitempty" example:"https://maps.app.goo.gl/xyz"`
+	Latitude      *float64          `json:"latitude,omitempty" example:"41.311081"`
+	Longitude     *float64          `json:"longitude,omitempty" example:"69.240562"`
 	LogoURL       string            `json:"logo_url" example:"/uploads/clinics/logo-123.jpg"`
 	CoverImageURL string            `json:"cover_image_url" example:"/uploads/clinics/cover-123.jpg"`
 	WorkingHours  []WorkingHourItem `json:"working_hours,omitempty"`
@@ -62,6 +64,8 @@ type UpdateClinicRequest struct {
 	District      *string            `json:"district,omitempty" example:"Yunusobod tumani"`
 	Address       *string            `json:"address,omitempty"`
 	LocationURL   *string            `json:"location_url,omitempty" example:"https://maps.app.goo.gl/xyz"`
+	Latitude      *float64           `json:"latitude,omitempty" example:"41.311081"`
+	Longitude     *float64           `json:"longitude,omitempty" example:"69.240562"`
 	LogoURL       *string            `json:"logo_url,omitempty"`
 	CoverImageURL *string            `json:"cover_image_url,omitempty"`
 	WorkingHours  *[]WorkingHourItem `json:"working_hours,omitempty"`
@@ -78,6 +82,8 @@ type ClinicSummaryDTO struct {
 	District      string    `json:"district"`
 	Address       string    `json:"address"`
 	LocationURL   string    `json:"location_url,omitempty"`
+	Latitude      *float64  `json:"latitude,omitempty"`
+	Longitude     *float64  `json:"longitude,omitempty"`
 	LogoURL       string    `json:"logo_url"`
 	CoverImageURL string    `json:"cover_image_url"`
 	Status        string    `json:"status"`
@@ -95,6 +101,8 @@ type ClinicDetailDTO struct {
 	District        string                `json:"district"`
 	Address         string                `json:"address"`
 	LocationURL     string                `json:"location_url,omitempty"`
+	Latitude        *float64              `json:"latitude,omitempty"`
+	Longitude       *float64              `json:"longitude,omitempty"`
 	LogoURL         string                `json:"logo_url"`
 	CoverImageURL   string                `json:"cover_image_url"`
 	Status          string                `json:"status"`
@@ -102,6 +110,7 @@ type ClinicDetailDTO struct {
 	OwnerID         uuid.UUID             `json:"owner_id"`
 	WorkingHours    []WorkingHourItem     `json:"working_hours"`
 	DoctorsCount    int                   `json:"doctors_count"`
+	Specialties     []SpecialtyDTO        `json:"specialties,omitempty"`
 	Doctors         []ClinicDoctorItemDTO `json:"doctors,omitempty"`
 	CreatedAt       time.Time             `json:"created_at"`
 	UpdatedAt       time.Time             `json:"updated_at"`

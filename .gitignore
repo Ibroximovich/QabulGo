@@ -3,6 +3,8 @@
 # ==========================================
 
 # 1. Environment & Sensitive Credentials (Xavfli maxfiy fayllar)
+.tmp/
+*/.tmp/
 .env
 .env.*
 *.env

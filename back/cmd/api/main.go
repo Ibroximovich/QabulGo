@@ -63,6 +63,7 @@ func main() {
 	doctorRepo := repositories.NewDoctorRepository(db)
 	specialtyRepo := repositories.NewSpecialtyRepository(db)
 	auditRepo := repositories.NewAuditRepository(db)
+	publicSearchRepo := repositories.NewPublicSearchRepository(db)
 
 	// 4. Services initsializatsiyasi
 	emailService := services.NewEmailService(cfg)
@@ -74,6 +75,7 @@ func main() {
 	adminService := services.NewAdminService(clinicRepo, doctorRepo, auditRepo)
 	specialtyService := services.NewSpecialtyService(specialtyRepo)
 	storageService := services.NewLocalStorageService("uploads", "/uploads")
+	publicSearchService := services.NewPublicSearchService(publicSearchRepo, doctorRepo)
 
 	// Mutaxassisliklar boshlang'ich seed
 	_ = specialtyService.SeedIfEmpty(context.Background())
@@ -87,18 +89,20 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(adminService)
 	specialtyHandler := handlers.NewSpecialtyHandler(specialtyService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
+	publicSearchHandler := handlers.NewPublicSearchHandler(publicSearchService)
 
 	// 6. Router initsializatsiyasi
 	router := routes.SetupRouter(&routes.RouterConfig{
-		Config:           cfg,
-		HealthHandler:    healthHandler,
-		AuthHandler:      authHandler,
-		PatientHandler:   patientHandler,
-		ClinicHandler:    clinicHandler,
-		DoctorHandler:    doctorHandler,
-		AdminHandler:     adminHandler,
-		SpecialtyHandler: specialtyHandler,
-		UploadHandler:    uploadHandler,
+		Config:              cfg,
+		HealthHandler:       healthHandler,
+		AuthHandler:         authHandler,
+		PatientHandler:      patientHandler,
+		ClinicHandler:       clinicHandler,
+		DoctorHandler:       doctorHandler,
+		AdminHandler:        adminHandler,
+		SpecialtyHandler:    specialtyHandler,
+		UploadHandler:       uploadHandler,
+		PublicSearchHandler: publicSearchHandler,
 	})
 
 	// 7. HTTP Server sozlamalari

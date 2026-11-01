@@ -3,6 +3,8 @@ package tests
 import (
 	"context"
 	"errors"
+	"math"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -620,6 +622,14 @@ func (m *MockSpecialtyRepository) GetByID(ctx context.Context, id uuid.UUID) (*m
 	return s, nil
 }
 
+func (m *MockSpecialtyRepository) Create(ctx context.Context, s *models.Specialty) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sCopy := *s
+	m.specialties[s.ID] = &sCopy
+	return nil
+}
+
 func (m *MockSpecialtyRepository) GetBySlug(ctx context.Context, slug string) (*models.Specialty, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -687,4 +697,461 @@ func (m *MockAuditRepository) GetReviewsByClinic(ctx context.Context, clinicID u
 		}
 	}
 	return list, nil
+}
+
+// MockPublicSearchRepository
+type MockPublicSearchRepository struct {
+	clinicRepo    *MockClinicRepository
+	doctorRepo    *MockDoctorRepository
+	specialtyRepo *MockSpecialtyRepository
+}
+
+func NewMockPublicSearchRepository(clinicRepo *MockClinicRepository, doctorRepo *MockDoctorRepository, specialtyRepo *MockSpecialtyRepository) *MockPublicSearchRepository {
+	return &MockPublicSearchRepository{
+		clinicRepo:    clinicRepo,
+		doctorRepo:    doctorRepo,
+		specialtyRepo: specialtyRepo,
+	}
+}
+
+func (m *MockPublicSearchRepository) SearchClinics(ctx context.Context, filter *dto.PublicClinicFilter) ([]models.Clinic, int64, error) {
+	m.clinicRepo.mu.Lock()
+	defer m.clinicRepo.mu.Unlock()
+
+	var matched []models.Clinic
+	for _, c := range m.clinicRepo.clinics {
+		if c.Status != models.ClinicStatusApproved {
+			continue
+		}
+		if filter != nil {
+			if filter.Search != "" {
+				term := strings.ToLower(strings.TrimSpace(filter.Search))
+				if !strings.Contains(strings.ToLower(c.Name), term) &&
+					!strings.Contains(strings.ToLower(c.Description), term) &&
+					!strings.Contains(strings.ToLower(c.Address), term) {
+					continue
+				}
+			}
+			if filter.Region != "" && !strings.EqualFold(c.Region, strings.TrimSpace(filter.Region)) {
+				continue
+			}
+			if filter.District != "" && !strings.EqualFold(c.District, strings.TrimSpace(filter.District)) {
+				continue
+			}
+			if filter.SpecialtyID != nil && strings.TrimSpace(*filter.SpecialtyID) != "" {
+				specUUID, _ := uuid.Parse(strings.TrimSpace(*filter.SpecialtyID))
+				hasSpec := false
+				m.doctorRepo.mu.Lock()
+				for _, cd := range m.doctorRepo.clinicDoctors {
+					if cd.ClinicID == c.ID && cd.SpecialtyID == specUUID && cd.IsActive && !cd.DeletedAt.Valid {
+						hasSpec = true
+						break
+					}
+				}
+				m.doctorRepo.mu.Unlock()
+				if !hasSpec {
+					continue
+				}
+			}
+		}
+
+		cCopy := *c
+		cCopy.WorkingHours = m.clinicRepo.workingHours[c.ID]
+		matched = append(matched, cCopy)
+	}
+
+	total := int64(len(matched))
+
+	// Stable sort by name
+	sort.Slice(matched, func(i, j int) bool {
+		return matched[i].Name < matched[j].Name
+	})
+
+	limit := 12
+	page := 1
+	if filter != nil {
+		if filter.Limit > 0 && filter.Limit <= 50 {
+			limit = filter.Limit
+		} else if filter.Limit > 50 {
+			limit = 50
+		}
+		if filter.Page > 0 {
+			page = filter.Page
+		}
+	}
+	offset := (page - 1) * limit
+	if offset >= len(matched) {
+		return []models.Clinic{}, total, nil
+	}
+	end := offset + limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+
+	return matched[offset:end], total, nil
+}
+
+func (m *MockPublicSearchRepository) GetApprovedClinicByID(ctx context.Context, id uuid.UUID) (*models.Clinic, error) {
+	m.clinicRepo.mu.Lock()
+	defer m.clinicRepo.mu.Unlock()
+
+	c, ok := m.clinicRepo.clinics[id]
+	if !ok || c.Status != models.ClinicStatusApproved {
+		return nil, repositories.ErrClinicNotFound
+	}
+	cCopy := *c
+	cCopy.WorkingHours = m.clinicRepo.workingHours[c.ID]
+	return &cCopy, nil
+}
+
+func (m *MockPublicSearchRepository) GetClinicSpecialties(ctx context.Context, clinicID uuid.UUID) ([]models.Specialty, error) {
+	m.doctorRepo.mu.Lock()
+	defer m.doctorRepo.mu.Unlock()
+	m.specialtyRepo.mu.Lock()
+	defer m.specialtyRepo.mu.Unlock()
+
+	specMap := make(map[uuid.UUID]models.Specialty)
+	for _, cd := range m.doctorRepo.clinicDoctors {
+		if cd.ClinicID == clinicID && cd.IsActive && !cd.DeletedAt.Valid {
+			if sp, ok := m.specialtyRepo.specialties[cd.SpecialtyID]; ok {
+				specMap[sp.ID] = *sp
+			}
+		}
+	}
+
+	var list []models.Specialty
+	for _, sp := range specMap {
+		list = append(list, sp)
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Name < list[j].Name
+	})
+	return list, nil
+}
+
+func (m *MockPublicSearchRepository) GetClinicActiveDoctors(ctx context.Context, clinicID uuid.UUID) ([]models.ClinicDoctor, error) {
+	m.doctorRepo.mu.Lock()
+	defer m.doctorRepo.mu.Unlock()
+	m.specialtyRepo.mu.Lock()
+	defer m.specialtyRepo.mu.Unlock()
+
+	var list []models.ClinicDoctor
+	for _, cd := range m.doctorRepo.clinicDoctors {
+		if cd.ClinicID == clinicID && cd.IsActive && !cd.DeletedAt.Valid {
+			cdCopy := *cd
+			if doc, ok := m.doctorRepo.doctors[cd.DoctorID]; ok {
+				docCopy := *doc
+				cdCopy.Doctor = &docCopy
+			}
+			if sp, ok := m.specialtyRepo.specialties[cd.SpecialtyID]; ok {
+				spCopy := *sp
+				cdCopy.Specialty = &spCopy
+			}
+			list = append(list, cdCopy)
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].ConsultationPrice < list[j].ConsultationPrice
+	})
+	return list, nil
+}
+
+func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371.0
+	dLat := (lat2 - lat1) * math.Pi / 180.0
+	dLon := (lon2 - lon1) * math.Pi / 180.0
+	rLat1 := lat1 * math.Pi / 180.0
+	rLat2 := lat2 * math.Pi / 180.0
+
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(rLat1)*math.Cos(rLat2)*math.Sin(dLon/2)*math.Sin(dLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return R * c
+}
+
+func (m *MockPublicSearchRepository) SearchNearbyClinics(ctx context.Context, filter *dto.NearbyClinicFilter) ([]repositories.NearbyClinicRaw, int64, error) {
+	m.clinicRepo.mu.Lock()
+	defer m.clinicRepo.mu.Unlock()
+
+	radius := filter.RadiusKM
+	if radius <= 0 {
+		radius = 10
+	} else if radius > 100 {
+		radius = 100
+	}
+
+	var matched []repositories.NearbyClinicRaw
+	for _, c := range m.clinicRepo.clinics {
+		if c.Status != models.ClinicStatusApproved || c.Latitude == nil || c.Longitude == nil {
+			continue
+		}
+
+		dist := haversineKm(filter.Latitude, filter.Longitude, *c.Latitude, *c.Longitude)
+		if dist > radius {
+			continue
+		}
+
+		if filter.SpecialtyID != nil && strings.TrimSpace(*filter.SpecialtyID) != "" {
+			specUUID, _ := uuid.Parse(strings.TrimSpace(*filter.SpecialtyID))
+			hasSpec := false
+			m.doctorRepo.mu.Lock()
+			for _, cd := range m.doctorRepo.clinicDoctors {
+				if cd.ClinicID == c.ID && cd.SpecialtyID == specUUID && cd.IsActive && !cd.DeletedAt.Valid {
+					hasSpec = true
+					break
+				}
+			}
+			m.doctorRepo.mu.Unlock()
+			if !hasSpec {
+				continue
+			}
+		}
+
+		matched = append(matched, repositories.NearbyClinicRaw{
+			Clinic:     *c,
+			DistanceKM: dist,
+		})
+	}
+
+	total := int64(len(matched))
+
+	// Sort by distance ASC, then Name ASC
+	sort.Slice(matched, func(i, j int) bool {
+		if matched[i].DistanceKM == matched[j].DistanceKM {
+			return matched[i].Name < matched[j].Name
+		}
+		return matched[i].DistanceKM < matched[j].DistanceKM
+	})
+
+	limit := 12
+	page := 1
+	if filter.Limit > 0 && filter.Limit <= 50 {
+		limit = filter.Limit
+	} else if filter.Limit > 50 {
+		limit = 50
+	}
+	if filter.Page > 0 {
+		page = filter.Page
+	}
+	offset := (page - 1) * limit
+	if offset >= len(matched) {
+		return []repositories.NearbyClinicRaw{}, total, nil
+	}
+	end := offset + limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+
+	return matched[offset:end], total, nil
+}
+
+func (m *MockPublicSearchRepository) SearchDoctors(ctx context.Context, filter *dto.PublicDoctorFilter) ([]models.ClinicDoctor, int64, error) {
+	m.doctorRepo.mu.Lock()
+	defer m.doctorRepo.mu.Unlock()
+	m.clinicRepo.mu.Lock()
+	defer m.clinicRepo.mu.Unlock()
+	m.specialtyRepo.mu.Lock()
+	defer m.specialtyRepo.mu.Unlock()
+
+	var matched []models.ClinicDoctor
+	for _, cd := range m.doctorRepo.clinicDoctors {
+		if !cd.IsActive || cd.DeletedAt.Valid {
+			continue
+		}
+		c, ok := m.clinicRepo.clinics[cd.ClinicID]
+		if !ok || c.Status != models.ClinicStatusApproved {
+			continue
+		}
+		doc, ok := m.doctorRepo.doctors[cd.DoctorID]
+		if !ok {
+			continue
+		}
+
+		if filter != nil {
+			if filter.Search != "" {
+				term := strings.ToLower(strings.TrimSpace(filter.Search))
+				fullName := strings.ToLower(doc.FirstName + " " + doc.LastName)
+				revName := strings.ToLower(doc.LastName + " " + doc.FirstName)
+				if !strings.Contains(strings.ToLower(doc.FirstName), term) &&
+					!strings.Contains(strings.ToLower(doc.LastName), term) &&
+					!strings.Contains(fullName, term) &&
+					!strings.Contains(revName, term) &&
+					!strings.Contains(strings.ToLower(doc.Bio), term) {
+					continue
+				}
+			}
+			if filter.Region != "" && !strings.EqualFold(c.Region, strings.TrimSpace(filter.Region)) {
+				continue
+			}
+			if filter.District != "" && !strings.EqualFold(c.District, strings.TrimSpace(filter.District)) {
+				continue
+			}
+			if filter.SpecialtyID != nil && strings.TrimSpace(*filter.SpecialtyID) != "" {
+				specUUID, _ := uuid.Parse(strings.TrimSpace(*filter.SpecialtyID))
+				if cd.SpecialtyID != specUUID {
+					continue
+				}
+			}
+			if filter.ClinicID != nil && strings.TrimSpace(*filter.ClinicID) != "" {
+				clinicUUID, _ := uuid.Parse(strings.TrimSpace(*filter.ClinicID))
+				if cd.ClinicID != clinicUUID {
+					continue
+				}
+			}
+			if filter.MinPrice != nil && cd.ConsultationPrice < *filter.MinPrice {
+				continue
+			}
+			if filter.MaxPrice != nil && cd.ConsultationPrice > *filter.MaxPrice {
+				continue
+			}
+		}
+
+		cdCopy := *cd
+		docCopy := *doc
+		cCopy := *c
+		cdCopy.Doctor = &docCopy
+		cdCopy.Clinic = &cCopy
+		if sp, spOk := m.specialtyRepo.specialties[cd.SpecialtyID]; spOk {
+			spCopy := *sp
+			cdCopy.Specialty = &spCopy
+		}
+		matched = append(matched, cdCopy)
+	}
+
+	total := int64(len(matched))
+
+	sortOrder := "name_asc"
+	if filter != nil && filter.Sort != "" {
+		sortOrder = filter.Sort
+	}
+
+	switch sortOrder {
+	case "price_asc":
+		sort.Slice(matched, func(i, j int) bool {
+			return matched[i].ConsultationPrice < matched[j].ConsultationPrice
+		})
+	case "price_desc":
+		sort.Slice(matched, func(i, j int) bool {
+			return matched[i].ConsultationPrice > matched[j].ConsultationPrice
+		})
+	case "experience_desc":
+		sort.Slice(matched, func(i, j int) bool {
+			return matched[i].Doctor.ExperienceYears > matched[j].Doctor.ExperienceYears
+		})
+	default:
+		sort.Slice(matched, func(i, j int) bool {
+			if matched[i].Doctor.LastName == matched[j].Doctor.LastName {
+				return matched[i].Doctor.FirstName < matched[j].Doctor.FirstName
+			}
+			return matched[i].Doctor.LastName < matched[j].Doctor.LastName
+		})
+	}
+
+	limit := 12
+	page := 1
+	if filter != nil {
+		if filter.Limit > 0 && filter.Limit <= 50 {
+			limit = filter.Limit
+		} else if filter.Limit > 50 {
+			limit = 50
+		}
+		if filter.Page > 0 {
+			page = filter.Page
+		}
+	}
+	offset := (page - 1) * limit
+	if offset >= len(matched) {
+		return []models.ClinicDoctor{}, total, nil
+	}
+	end := offset + limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+
+	return matched[offset:end], total, nil
+}
+
+func (m *MockPublicSearchRepository) GetDoctorByIDOrClinicDoctorID(ctx context.Context, targetID uuid.UUID) (*models.Doctor, []models.ClinicDoctor, error) {
+	m.doctorRepo.mu.Lock()
+	defer m.doctorRepo.mu.Unlock()
+	m.clinicRepo.mu.Lock()
+	defer m.clinicRepo.mu.Unlock()
+	m.specialtyRepo.mu.Lock()
+	defer m.specialtyRepo.mu.Unlock()
+
+	var foundDoctor *models.Doctor
+	if doc, ok := m.doctorRepo.doctors[targetID]; ok {
+		foundDoctor = doc
+	} else {
+		for _, cd := range m.doctorRepo.clinicDoctors {
+			if cd.ID == targetID {
+				if d, dOk := m.doctorRepo.doctors[cd.DoctorID]; dOk {
+					foundDoctor = d
+					break
+				}
+			}
+		}
+	}
+
+	if foundDoctor == nil {
+		return nil, nil, repositories.ErrDoctorNotFound
+	}
+
+	var workplaces []models.ClinicDoctor
+	for _, cd := range m.doctorRepo.clinicDoctors {
+		if cd.DoctorID == foundDoctor.ID && cd.IsActive && !cd.DeletedAt.Valid {
+			c, cOk := m.clinicRepo.clinics[cd.ClinicID]
+			if cOk && c.Status == models.ClinicStatusApproved {
+				cdCopy := *cd
+				cCopy := *c
+				cdCopy.Clinic = &cCopy
+				if sp, spOk := m.specialtyRepo.specialties[cd.SpecialtyID]; spOk {
+					spCopy := *sp
+					cdCopy.Specialty = &spCopy
+				}
+				workplaces = append(workplaces, cdCopy)
+			}
+		}
+	}
+
+	if len(workplaces) == 0 {
+		return nil, nil, repositories.ErrDoctorNotFound
+	}
+
+	docCopy := *foundDoctor
+	return &docCopy, workplaces, nil
+}
+
+func (m *MockPublicSearchRepository) GetRegionsCatalog(ctx context.Context) ([]dto.RegionItemDTO, error) {
+	m.clinicRepo.mu.Lock()
+	defer m.clinicRepo.mu.Unlock()
+
+	regMap := make(map[string]map[string]bool)
+	for _, c := range m.clinicRepo.clinics {
+		if c.Status == models.ClinicStatusApproved && c.Region != "" {
+			if _, ok := regMap[c.Region]; !ok {
+				regMap[c.Region] = make(map[string]bool)
+			}
+			if c.District != "" {
+				regMap[c.Region][c.District] = true
+			}
+		}
+	}
+
+	var res []dto.RegionItemDTO
+	for reg, distMap := range regMap {
+		var dists []string
+		for dist := range distMap {
+			dists = append(dists, dist)
+		}
+		sort.Strings(dists)
+		res = append(res, dto.RegionItemDTO{
+			Region:    reg,
+			Districts: dists,
+		})
+	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Region < res[j].Region
+	})
+	return res, nil
 }

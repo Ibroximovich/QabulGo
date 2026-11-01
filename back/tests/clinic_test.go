@@ -69,6 +69,8 @@ func setupClinicTestApp() *TestClinicApp {
 	adminService := services.NewAdminService(clinicRepo, doctorRepo, auditRepo)
 	specialtyService := services.NewSpecialtyService(specialtyRepo)
 	storageService := services.NewLocalStorageService("uploads_test", "/uploads")
+	publicSearchRepo := NewMockPublicSearchRepository(clinicRepo, doctorRepo, specialtyRepo)
+	publicSearchService := services.NewPublicSearchService(publicSearchRepo, doctorRepo)
 
 	healthHandler := handlers.NewHealthHandler()
 	authHandler := handlers.NewAuthHandler(cfg, authService, tokenService)
@@ -78,17 +80,19 @@ func setupClinicTestApp() *TestClinicApp {
 	adminHandler := handlers.NewAdminHandler(adminService)
 	specialtyHandler := handlers.NewSpecialtyHandler(specialtyService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
+	publicSearchHandler := handlers.NewPublicSearchHandler(publicSearchService)
 
 	router := routes.SetupRouter(&routes.RouterConfig{
-		Config:           cfg,
-		HealthHandler:    healthHandler,
-		AuthHandler:      authHandler,
-		PatientHandler:   patientHandler,
-		ClinicHandler:    clinicHandler,
-		DoctorHandler:    doctorHandler,
-		AdminHandler:     adminHandler,
-		SpecialtyHandler: specialtyHandler,
-		UploadHandler:    uploadHandler,
+		Config:              cfg,
+		HealthHandler:       healthHandler,
+		AuthHandler:         authHandler,
+		PatientHandler:      patientHandler,
+		ClinicHandler:       clinicHandler,
+		DoctorHandler:       doctorHandler,
+		AdminHandler:        adminHandler,
+		SpecialtyHandler:    specialtyHandler,
+		UploadHandler:       uploadHandler,
+		PublicSearchHandler: publicSearchHandler,
 	})
 
 	return &TestClinicApp{
