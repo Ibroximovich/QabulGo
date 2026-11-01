@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-blue: 8 102 245;
+    --brand-teal: 8 189 186;
+    --brand-navy: 8 35 74;
+    --brand-bg: 247 250 252;
+  }
+
+  html {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-brand-bg text-brand-navy font-sans min-h-screen overflow-x-hidden;
+  }
+
+  /* Accessibility focus ring */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-blue ring-offset-2 ring-offset-white;
+  }
+
+  /* Custom input styling */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, #0866F5 0%, #08BDBA 100%);
+  }
+
+  .gradient-subtle {
+    background: linear-gradient(180deg, #F0F6FF 0%, #F7FAFC 100%);
+  }
+}
+

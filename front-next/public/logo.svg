@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="qgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0866F5" />
+      <stop offset="100%" stop-color="#08BDBA" />
+    </linearGradient>
+    <linearGradient id="qgLeaf" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0866F5" />
+      <stop offset="100%" stop-color="#08BDBA" />
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square for icon use -->
+  <rect width="512" height="512" rx="112" fill="#FFFFFF"/>
+  <!-- Q Main Ring -->
+  <circle cx="256" cy="230" r="130" stroke="url(#qgGradient)" stroke-width="48" fill="none"/>
+  <!-- Medical Plus in center -->
+  <rect x="238" y="175" width="36" height="110" rx="10" fill="url(#qgGradient)"/>
+  <rect x="201" y="212" width="110" height="36" rx="10" fill="url(#qgGradient)"/>
+  <!-- Q Tail / Swoosh -->
+  <path d="M280 295 C330 295 385 330 405 385 C370 385 315 365 265 315 Z" fill="url(#qgLeaf)"/>
+  <!-- Wordmark -->
+  <text x="145" y="445" font-family="'Inter', sans-serif" font-size="62" font-weight="800" fill="#08234A">Qabul</text>
+  <text x="325" y="445" font-family="'Inter', sans-serif" font-size="62" font-weight="800" fill="#08BDBA">Go</text>
+</svg>
+

@@ -1,0 +1,98 @@
+# ==========================================
+# QabulGo Root .gitignore
+# ==========================================
+
+# 1. Environment & Sensitive Credentials (Xavfli maxfiy fayllar)
+.env
+.env.*
+*.env
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+!*.env.example
+
+# 2. Uploaded Media & Files (Foydalanuvchilar yuklagan surat va fayllar)
+uploads/*
+*/uploads/*
+back/uploads/*
+back/tests/uploads_test/
+*/tests/uploads_test/
+!back/uploads/.gitkeep
+!back/uploads/*/.gitkeep
+
+# 3. Node & Frontend Dependencies (Kutubxonalar)
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+
+# 4. Build Outputs (Kompilyatsiya va yig'ilgan frontend)
+.next/
+*/.next/
+out/
+*/out/
+dist/
+*/dist/
+build/
+*/build/
+*.tsbuildinfo
+next-env.d.ts
+
+# 5. Go Binaries & Executables
+bin/
+*/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 6. Test & Coverage Artifacts
+*.test
+*.out
+coverage/
+*/coverage/
+coverage.html
+
+# 7. Database & Docker Data Volumes
+postgres_data/
+pgdata/
+*.sqlite
+*.sqlite3
+*.db
+
+# 8. Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 9. IDE & Editor Specific Files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.antigravity/
+
+# 10. Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# 11. Certificates & Private Keys
+*.pem
+*.key
+*.crt
+*.pfx

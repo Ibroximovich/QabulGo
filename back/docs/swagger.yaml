@@ -1,0 +1,1564 @@
+basePath: /
+definitions:
+  qabulgo-backend_internal_dto.AdminReviewClinicRequest:
+    properties:
+      reason:
+        example: Tibbiy litsenziya ma'lumotlari kiritilmagan
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.ClinicDetailDTO:
+    properties:
+      address:
+        type: string
+      cover_image_url:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      district:
+        type: string
+      doctors:
+        items:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO'
+        type: array
+      doctors_count:
+        type: integer
+      email:
+        type: string
+      id:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      phone:
+        type: string
+      region:
+        type: string
+      rejection_reason:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      working_hours:
+        items:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.WorkingHourItem'
+        type: array
+    type: object
+  qabulgo-backend_internal_dto.ClinicDoctorItemDTO:
+    properties:
+      appointment_duration_minutes:
+        type: integer
+      bio:
+        type: string
+      clinic_id:
+        type: string
+      consultation_price:
+        type: number
+      created_at:
+        type: string
+      doctor_id:
+        type: string
+      experience_years:
+        type: integer
+      first_name:
+        type: string
+      id:
+        description: clinic_doctor id
+        type: string
+      is_active:
+        type: boolean
+      last_name:
+        type: string
+      photo_url:
+        type: string
+      specialty:
+        $ref: '#/definitions/qabulgo-backend_internal_dto.SpecialtyDTO'
+      updated_at:
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.ClinicLoginRequest:
+    properties:
+      email:
+        example: jamshid@clinic.uz
+        type: string
+      password:
+        example: ClinicPass123!
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  qabulgo-backend_internal_dto.ClinicRegisterRequest:
+    properties:
+      accept_terms:
+        example: true
+        type: boolean
+      confirm_password:
+        example: ClinicPass123!
+        type: string
+      email:
+        example: jamshid@clinic.uz
+        type: string
+      first_name:
+        example: Jamshid
+        type: string
+      last_name:
+        example: Karimov
+        type: string
+      password:
+        example: ClinicPass123!
+        type: string
+      phone:
+        example: "+998901234567"
+        type: string
+    required:
+    - confirm_password
+    - email
+    - first_name
+    - last_name
+    - password
+    - phone
+    type: object
+  qabulgo-backend_internal_dto.ClinicSummaryDTO:
+    properties:
+      address:
+        type: string
+      cover_image_url:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      district:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      region:
+        type: string
+      status:
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.CreateClinicRequest:
+    properties:
+      address:
+        example: Amir Temur ko'chasi, 45-uy
+        type: string
+      cover_image_url:
+        example: /uploads/clinics/cover-123.jpg
+        type: string
+      description:
+        example: Zamonaviy ko'p tarmoqli xususiy klinika
+        type: string
+      district:
+        example: Yunusobod tumani
+        type: string
+      email:
+        example: info@shifonur.uz
+        type: string
+      logo_url:
+        example: /uploads/clinics/logo-123.jpg
+        type: string
+      name:
+        example: Shifo Nur Med
+        type: string
+      phone:
+        example: "+998712001122"
+        type: string
+      region:
+        example: Toshkent shahri
+        type: string
+      working_hours:
+        items:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.WorkingHourItem'
+        type: array
+    required:
+    - address
+    - district
+    - name
+    - phone
+    - region
+    type: object
+  qabulgo-backend_internal_dto.CreateDoctorRequest:
+    properties:
+      appointment_duration_minutes:
+        example: 30
+        maximum: 240
+        minimum: 5
+        type: integer
+      bio:
+        example: 15 yillik tajribaga ega oliy toifali kardiolog
+        type: string
+      consultation_price:
+        example: 150000
+        minimum: 0
+        type: number
+      experience_years:
+        example: 15
+        maximum: 70
+        minimum: 0
+        type: integer
+      first_name:
+        example: Anvar
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      last_name:
+        example: Saidov
+        type: string
+      photo_url:
+        example: /uploads/doctors/doctor-123.jpg
+        type: string
+      specialty_id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        type: string
+    required:
+    - appointment_duration_minutes
+    - consultation_price
+    - first_name
+    - last_name
+    - specialty_id
+    type: object
+  qabulgo-backend_internal_dto.ErrorResponse:
+    properties:
+      errors:
+        additionalProperties:
+          type: string
+        type: object
+      message:
+        example: Kiritilgan ma'lumotlarda xatolik mavjud
+        type: string
+      success:
+        example: false
+        type: boolean
+    type: object
+  qabulgo-backend_internal_dto.ForgotPasswordRequest:
+    properties:
+      email:
+        example: ali@example.com
+        type: string
+    required:
+    - email
+    type: object
+  qabulgo-backend_internal_dto.LoginData:
+    properties:
+      access_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      expires_in:
+        description: soniyada (15 daqiqa)
+        example: 900
+        type: integer
+      token_type:
+        example: Bearer
+        type: string
+      user:
+        $ref: '#/definitions/qabulgo-backend_internal_dto.UserSummary'
+    type: object
+  qabulgo-backend_internal_dto.PatientLoginRequest:
+    properties:
+      email:
+        example: ali@example.com
+        type: string
+      password:
+        example: StrongPass123!
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  qabulgo-backend_internal_dto.PatientProfileResponse:
+    properties:
+      created_at:
+        example: "2026-10-30T10:00:00Z"
+        type: string
+      email:
+        example: ali@example.com
+        type: string
+      email_verified:
+        example: true
+        type: boolean
+      first_name:
+        example: Ali
+        type: string
+      id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        type: string
+      last_name:
+        example: Valiyev
+        type: string
+      phone:
+        example: "+998901234567"
+        type: string
+      role:
+        example: patient
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.PatientRegisterData:
+    properties:
+      created_at:
+        example: "2026-10-30T10:00:00Z"
+        type: string
+      email:
+        example: ali@example.com
+        type: string
+      first_name:
+        example: Ali
+        type: string
+      id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        type: string
+      last_name:
+        example: Valiyev
+        type: string
+      phone:
+        example: "+998901234567"
+        type: string
+      role:
+        example: patient
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.PatientRegisterRequest:
+    properties:
+      accept_terms:
+        example: true
+        type: boolean
+      confirm_password:
+        example: StrongPass123!
+        type: string
+      email:
+        example: ali@example.com
+        type: string
+      first_name:
+        example: Ali
+        type: string
+      last_name:
+        example: Valiyev
+        type: string
+      password:
+        example: StrongPass123!
+        type: string
+      phone:
+        example: "+998901234567"
+        type: string
+    required:
+    - confirm_password
+    - email
+    - first_name
+    - last_name
+    - password
+    - phone
+    type: object
+  qabulgo-backend_internal_dto.ResendVerificationRequest:
+    properties:
+      email:
+        example: ali@example.com
+        type: string
+    required:
+    - email
+    type: object
+  qabulgo-backend_internal_dto.ResetPasswordRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+      confirm_password:
+        example: NewStrongPass123!
+        type: string
+      email:
+        example: ali@example.com
+        type: string
+      new_password:
+        example: NewStrongPass123!
+        type: string
+    required:
+    - code
+    - confirm_password
+    - email
+    - new_password
+    type: object
+  qabulgo-backend_internal_dto.SpecialtyDTO:
+    properties:
+      icon_url:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        example: Amal muvaffaqiyatli bajarildi
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  qabulgo-backend_internal_dto.SuperAdminLoginRequest:
+    properties:
+      email:
+        example: admin@qabulgo.uz
+        type: string
+      password:
+        example: SuperAdminPass123!
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  qabulgo-backend_internal_dto.UpdateClinicRequest:
+    properties:
+      address:
+        type: string
+      cover_image_url:
+        type: string
+      description:
+        type: string
+      district:
+        example: Yunusobod tumani
+        type: string
+      email:
+        type: string
+      logo_url:
+        type: string
+      name:
+        example: Shifo Nur Med Clinic
+        type: string
+      phone:
+        example: "+998712001122"
+        type: string
+      region:
+        example: Toshkent shahri
+        type: string
+      working_hours:
+        items:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.WorkingHourItem'
+        type: array
+    type: object
+  qabulgo-backend_internal_dto.UpdateDoctorRequest:
+    properties:
+      appointment_duration_minutes:
+        type: integer
+      bio:
+        type: string
+      consultation_price:
+        type: number
+      experience_years:
+        type: integer
+      first_name:
+        example: Anvar
+        type: string
+      is_active:
+        type: boolean
+      last_name:
+        example: Saidov
+        type: string
+      photo_url:
+        type: string
+      specialty_id:
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.UpdatePatientProfileRequest:
+    properties:
+      first_name:
+        example: Ali
+        type: string
+      last_name:
+        example: Valiyev
+        type: string
+      phone:
+        example: "+998901234567"
+        type: string
+    required:
+    - first_name
+    - last_name
+    - phone
+    type: object
+  qabulgo-backend_internal_dto.UploadResponse:
+    properties:
+      filename:
+        example: uuid.jpg
+        type: string
+      mime_type:
+        example: image/jpeg
+        type: string
+      size:
+        example: 102400
+        type: integer
+      url:
+        example: /uploads/clinics/uuid.jpg
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.UserSummary:
+    properties:
+      email:
+        example: ali@example.com
+        type: string
+      first_name:
+        example: Ali
+        type: string
+      id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        type: string
+      last_name:
+        example: Valiyev
+        type: string
+      phone:
+        example: "+998901234567"
+        type: string
+      role:
+        example: patient
+        type: string
+    type: object
+  qabulgo-backend_internal_dto.VerifyEmailRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+      email:
+        example: ali@example.com
+        type: string
+    required:
+    - code
+    - email
+    type: object
+  qabulgo-backend_internal_dto.WorkingHourItem:
+    properties:
+      closing_time:
+        example: "18:00"
+        type: string
+      is_closed:
+        example: false
+        type: boolean
+      opening_time:
+        example: "08:00"
+        type: string
+      weekday:
+        description: 1=Dushanba, 7=Yakshanba
+        example: 1
+        maximum: 7
+        minimum: 1
+        type: integer
+    required:
+    - weekday
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@qabulgo.uz
+    name: QabulGo Support
+  description: 'QabulGo — O‘zbekistondagi xususiy klinikalar, shifokorlar va bemorlarni
+    bog‘lovchi platforma (1-bosqich: Bemorlar uchun Authentication).'
+  title: QabulGo Backend API
+  version: "1.0"
+paths:
+  /api/v1/admin/clinics:
+    get:
+      description: Status bo‘yicha filtrlash (draft, pending, approved, rejected,
+        suspended), qidiruv va sahifalash
+      parameters:
+      - description: 'Status (masalan: pending)'
+        in: query
+        name: status
+        type: string
+      - description: Qidiruv
+        in: query
+        name: search
+        type: string
+      - description: Sahifa
+        in: query
+        name: page
+        type: integer
+      - description: Miqdor
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinikalar ro‘yxati
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicSummaryDTO'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Superadmin uchun klinikalar ro‘yxati
+      tags:
+      - Superadmin
+  /api/v1/admin/clinics/{id}:
+    get:
+      description: Klinika ma’lumotlari, ish vaqtlari, shifokorlar soni va audit tarixi
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika tafsilotlari
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Superadmin uchun klinika to‘liq ma’lumotlari va tekshiruv tarixi
+      tags:
+      - Superadmin
+  /api/v1/admin/clinics/{id}/approve:
+    post:
+      description: 'Superadmin klinikani tasdiqlaydi (status: approved) va tizimda
+        faol qiladi'
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika muvaffaqiyatli tasdiqlandi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+      security:
+      - BearerAuth: []
+      summary: Klinikani tasdiqlash
+      tags:
+      - Superadmin
+  /api/v1/admin/clinics/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: 'Superadmin arizani rad etadi va sababini qayd qiladi (status:
+        rejected)'
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rad etish sababi
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.AdminReviewClinicRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika rad etildi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+      security:
+      - BearerAuth: []
+      summary: Klinikani rad etish
+      tags:
+      - Superadmin
+  /api/v1/admin/clinics/{id}/suspend:
+    post:
+      consumes:
+      - application/json
+      description: 'Superadmin qoidabuzarlik yoki tekshiruv tufayli klinikani bloklaydi
+        (status: suspended)'
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Bloklash sababi
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.AdminReviewClinicRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika bloklandi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+      security:
+      - BearerAuth: []
+      summary: Klinikani bloklash / to‘xtatish
+      tags:
+      - Superadmin
+  /api/v1/auth/admin/login:
+    post:
+      consumes:
+      - application/json
+      description: Faqat superadmin huquqiga ega foydalanuvchilar kirishi uchun
+      parameters:
+      - description: Superadmin login ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.SuperAdminLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Muvaffaqiyatli kirildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.LoginData'
+              type: object
+        "401":
+          description: Email yoki parol noto‘g‘ri
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "403":
+          description: Ruxsat berilmagan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Superadmin paneliga kirish
+      tags:
+      - Auth
+  /api/v1/auth/clinic/login:
+    post:
+      consumes:
+      - application/json
+      description: Email va parol orqali tizimga kiradi (faqat clinic_owner yoki clinic_admin)
+      parameters:
+      - description: Klinika login ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Muvaffaqiyatli kirildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.LoginData'
+              type: object
+        "401":
+          description: Email yoki parol noto‘g‘ri
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "403":
+          description: Email tasdiqlanmagan yoki ruxsat yo‘q
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Klinika kabinetiga kirish
+      tags:
+      - Auth
+  /api/v1/auth/clinic/register:
+    post:
+      consumes:
+      - application/json
+      description: Yangi klinika egasini ro‘yxatdan o‘tkazadi va emailga tasdiqlash
+        kodi yuboradi
+      parameters:
+      - description: Klinika egasi ro‘yxatdan o‘tish ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Muvaffaqiyatli ro‘yxatdan o‘tildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.PatientRegisterData'
+              type: object
+        "400":
+          description: Noto‘g‘ri ma’lumot kiritilgan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "409":
+          description: Email yoki telefon allaqachon mavjud
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "422":
+          description: Validatsiya xatoligi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Klinika egasi ro‘yxatdan o‘tishi
+      tags:
+      - Auth
+  /api/v1/auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Email kiritiladi, agar mavjud bo‘lsa parolni tiklash kodi yuboriladi
+      parameters:
+      - description: Email
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tiklash kodi yuborildi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+      summary: Parolni unutganda tiklash so‘rovi
+      tags:
+      - Auth
+  /api/v1/auth/logout:
+    post:
+      description: Refresh token sessiyasini bekor qiladi va cookie'ni tozalaydi
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Muvaffaqiyatli chiqildi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+      summary: Kabinetdan chiqish
+      tags:
+      - Auth
+  /api/v1/auth/patient/login:
+    post:
+      consumes:
+      - application/json
+      description: Email va parol orqali tizimga kiradi, access token va HttpOnly
+        refresh token cookie qaytaradi
+      parameters:
+      - description: Login ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.PatientLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Muvaffaqiyatli kirildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.LoginData'
+              type: object
+        "401":
+          description: Email yoki parol noto‘g‘ri
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "403":
+          description: Email tasdiqlanmagan yoki akkaunt bloklangan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Bemor kabinetiga kirish
+      tags:
+      - Auth
+  /api/v1/auth/patient/register:
+    post:
+      consumes:
+      - application/json
+      description: Yangi bemor foydalanuvchini ro‘yxatdan o‘tkazadi va emailga tasdiqlash
+        kodi yuboradi
+      parameters:
+      - description: Ro‘yxatdan o‘tish ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.PatientRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Muvaffaqiyatli ro‘yxatdan o‘tildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.PatientRegisterData'
+              type: object
+        "400":
+          description: Noto‘g‘ri ma’lumot kiritilgan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "409":
+          description: Email yoki telefon allaqachon mavjud
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "422":
+          description: Validatsiya xatoligi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Bemor ro‘yxatdan o‘tishi
+      tags:
+      - Auth
+  /api/v1/auth/refresh:
+    post:
+      description: HttpOnly cookie yoki body'dagi refresh token orqali yangi access
+        token va yangi refresh token beradi
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token yangilandi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+        "401":
+          description: Yaroqsiz yoki muddati tugagan refresh token
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Access tokenni yangilash
+      tags:
+      - Auth
+  /api/v1/auth/resend-verification:
+    post:
+      consumes:
+      - application/json
+      description: Emailga yangi bir martalik tasdiqlash kodini yuboradi
+      parameters:
+      - description: Email
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.ResendVerificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Kod qayta yuborildi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+        "400":
+          description: Xatolik
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Tasdiqlash kodini qayta yuborish
+      tags:
+      - Auth
+  /api/v1/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Kod va yangi parol orqali parolni o‘zgartiradi va mavjud sessiyalarni
+        to‘xtatadi
+      parameters:
+      - description: Tiklash ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Parol muvaffaqiyatli o‘zgartirildi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+        "400":
+          description: Kod yoki parol noto‘g‘ri
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Parolni tiklash
+      tags:
+      - Auth
+  /api/v1/auth/verify-email:
+    post:
+      consumes:
+      - application/json
+      description: 6 xonali tasdiqlash kodi orqali emailni tasdiqlaydi va avtomatik
+        sessiya yaratadi
+      parameters:
+      - description: Email va tasdiqlash kodi
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.VerifyEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Email muvaffaqiyatli tasdiqlandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.LoginData'
+              type: object
+        "400":
+          description: Kod noto‘g‘ri yoki muddati tugagan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "429":
+          description: Ko‘p noto‘g‘ri urinish
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Emailni tasdiqlash
+      tags:
+      - Auth
+  /api/v1/clinics:
+    post:
+      consumes:
+      - application/json
+      description: 'Klinika egasi yangi klinika profilini yaratadi (status: draft)'
+      parameters:
+      - description: Klinika ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.CreateClinicRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Klinika muvaffaqiyatli yaratildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO'
+              type: object
+        "400":
+          description: Validatsiya xatoligi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "401":
+          description: Avtorizatsiya talab qilinadi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "409":
+          description: Siz allaqachon klinika yaratgansiz
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Yangi klinika yaratish
+      tags:
+      - Clinic Profile
+  /api/v1/clinics/{id}:
+    get:
+      description: Klinika ma’lumotlarini olish (tasdiqlangan klinikalar ochiq, boshqalari
+        faqat egasi yoki superadmin uchun)
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika ma’lumotlari
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO'
+              type: object
+        "404":
+          description: Klinika topilmadi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Klinika ma’lumotlarini ID orqali ko‘rish
+      tags:
+      - Clinic Profile
+    patch:
+      consumes:
+      - application/json
+      description: Klinika profilini va ish soatlarini yangilash (faqat klinika egasi/admini)
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Tahrirlash ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.UpdateClinicRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika yangilandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO'
+              type: object
+        "400":
+          description: Xatolik
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "403":
+          description: Ruxsat yo‘q
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "404":
+          description: Klinika topilmadi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Klinika ma’lumotlarini tahrirlash
+      tags:
+      - Clinic Profile
+  /api/v1/clinics/{id}/doctors:
+    get:
+      description: Filtrlash, qidirish va sahifalash imkoniyati bilan
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Mutaxassislik ID
+        in: query
+        name: specialty_id
+        type: string
+      - description: Faollik holati
+        in: query
+        name: is_active
+        type: boolean
+      - description: Qidiruv (ism/familiya)
+        in: query
+        name: search
+        type: string
+      - description: Sahifa (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Miqdor (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shifokorlar ro‘yxati
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO'
+                  type: array
+              type: object
+      summary: Klinika shifokorlarini ro‘yxatini olish
+      tags:
+      - Doctor Management
+    post:
+      consumes:
+      - application/json
+      description: Klinika ma’muri yangi shifokor yaratib, o‘z klinikasiga bog‘laydi
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.CreateDoctorRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Shifokor qo‘shildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO'
+              type: object
+        "400":
+          description: Validatsiya xatoligi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "403":
+          description: Ruxsat yo‘q
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Klinikaga yangi shifokor qo‘shish
+      tags:
+      - Doctor Management
+  /api/v1/clinics/{id}/doctors/{doctorId}:
+    delete:
+      description: Soft-delete mexanizmi orqali shifokorni klinikadan o‘chirish
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shifokor o‘chirildi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+        "403":
+          description: Ruxsat yo‘q
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Shifokorni o‘chirish / nofaol qilish
+      tags:
+      - Doctor Management
+    get:
+      description: Klinika va shifokor bog‘lanmasi ma’lumotlari
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor (clinic_doctor) UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shifokor ma’lumotlari
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO'
+              type: object
+        "404":
+          description: Shifokor topilmadi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      summary: Shifokor batafsil ma’lumotlarini olish
+      tags:
+      - Doctor Management
+    patch:
+      consumes:
+      - application/json
+      description: Narx, qabul vaqti, tavsif, faollik va shaxsiy ma’lumotlarni yangilash
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shifokor UUID
+        in: path
+        name: doctorId
+        required: true
+        type: string
+      - description: Tahrirlash ma’lumotlari
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.UpdateDoctorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shifokor yangilandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDoctorItemDTO'
+              type: object
+        "403":
+          description: Ruxsat yo‘q
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Shifokor ma’lumotlarini tahrirlash
+      tags:
+      - Doctor Management
+  /api/v1/clinics/{id}/submit:
+    post:
+      description: 'Klinika ma’lumotlari to‘liq kiritilgach, superadmin tekshiruvi
+        uchun yuboradi (status: pending)'
+      parameters:
+      - description: Klinika UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika tekshiruvga yuborildi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO'
+              type: object
+        "400":
+          description: Yetarli ma’lumot to‘ldirilmagan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "403":
+          description: Ruxsat yo‘q
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Klinikani tekshiruvga yuborish
+      tags:
+      - Clinic Profile
+  /api/v1/clinics/mine:
+    get:
+      description: Avtorizatsiyadan o‘tgan klinika xodimi/egasining klinika ma’lumotlari
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Klinika ma’lumotlari
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.ClinicDetailDTO'
+              type: object
+        "401":
+          description: Avtorizatsiya talab qilinadi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "404":
+          description: Klinika topilmadi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: O‘z klinikasini ko‘rish
+      tags:
+      - Clinic Profile
+  /api/v1/patient/me:
+    get:
+      description: Avtorizatsiyadan o‘tgan bemorning shaxsiy ma’lumotlarini qaytaradi
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bemor profili
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.PatientProfileResponse'
+              type: object
+        "401":
+          description: Avtorizatsiyadan o‘tilmagan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "403":
+          description: Ruxsat berilmagan rol
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "404":
+          description: Foydalanuvchi topilmadi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Bemor profilini ko‘rish
+      tags:
+      - Patient
+    patch:
+      consumes:
+      - application/json
+      description: Bemor ism, familiya va telefon raqamini o‘zgartira oladi (email
+        o‘zgarmaydi)
+      parameters:
+      - description: Yangi ma’lumotlar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/qabulgo-backend_internal_dto.UpdatePatientProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profil muvaffaqiyatli yangilandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.PatientProfileResponse'
+              type: object
+        "400":
+          description: Validatsiya xatoligi
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "401":
+          description: Avtorizatsiyadan o‘tilmagan
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+        "409":
+          description: Telefon raqami allaqachon mavjud
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Bemor profilini tahrirlash
+      tags:
+      - Patient
+  /api/v1/specialties:
+    get:
+      description: Klinikaga shifokor biriktirish va qidiruv uchun mutaxassisliklar
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Mutaxassisliklar ro‘yxati
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/qabulgo-backend_internal_dto.SpecialtyDTO'
+                  type: array
+              type: object
+      summary: Barcha tibbiy mutaxassisliklar ro‘yxati
+      tags:
+      - Specialties
+  /api/v1/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Faqat JPEG, PNG, WebP formatlari, maksimal hajm 5MB
+      parameters:
+      - description: Rasm fayli
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: 'Papka nomi (masalan: clinics yoki doctors)'
+        in: query
+        name: folder
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Rasm muvaffaqiyatli yuklandi
+          schema:
+            allOf:
+            - $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/qabulgo-backend_internal_dto.UploadResponse'
+              type: object
+        "400":
+          description: Fayl formati noto‘g‘ri yoki hajm katta
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Rasm yuklash (klinika logotipi, cover yoki shifokor rasmi)
+      tags:
+      - Uploads
+  /health:
+    get:
+      description: Server faol ekanligini bildiradi
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/qabulgo-backend_internal_dto.SuccessResponse'
+      summary: Server holatini tekshirish
+      tags:
+      - System
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

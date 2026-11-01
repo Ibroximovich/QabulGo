@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <!-- Q Ring Gradient: Royal Blue to Medical Teal -->
+    <linearGradient id="qgRingGrad" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#0066FF" />
+      <stop offset="55%" stop-color="#0099FF" />
+      <stop offset="100%" stop-color="#00D2C4" />
+    </linearGradient>
+
+    <!-- Medical Plus Gradient -->
+    <linearGradient id="qgCrossGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5D4" />
+      <stop offset="100%" stop-color="#00BFA5" />
+    </linearGradient>
+
+    <!-- Q Tail Gradient -->
+    <linearGradient id="qgTailGrad" x1="20%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00C4B4" />
+      <stop offset="100%" stop-color="#00DFC8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Q Main Torus / Ring -->
+  <circle
+    cx="54"
+    cy="50"
+    r="31"
+    stroke="url(#qgRingGrad)"
+    stroke-width="14"
+    stroke-linecap="round"
+  />
+
+  <!-- Medical Cross (+) in Center -->
+  <rect x="49" y="35" width="10" height="30" rx="4.5" fill="url(#qgCrossGrad)" />
+  <rect x="39" y="45" width="30" height="10" rx="4.5" fill="url(#qgCrossGrad)" />
+
+  <!-- Q Tail / Swoosh -->
+  <path
+    d="M 52 75 C 65 77 75 74 94 66 C 88 56 75 51 64 57 C 60 63 56 70 52 75 Z"
+    fill="url(#qgTailGrad)"
+  />
+  <path
+    d="M 56 73 C 68 76 82 72 96 64 C 91 62 82 60 74 55 C 66 61 60 67 56 73 Z"
+    fill="#00E5D4"
+    opacity="0.85"
+  />
+</svg>
