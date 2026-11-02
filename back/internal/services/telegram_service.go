@@ -36,6 +36,9 @@ type TelegramService interface {
 	DisconnectClinicRecipient(ctx context.Context, clinicID, userID, recipientID uuid.UUID) error
 	ToggleClinicNotifications(ctx context.Context, clinicID, userID, recipientID uuid.UUID) (*dto.ClinicTelegramRecipientDTO, error)
 
+	// Admin Cabinet Endpoints
+	GetAdminTelegramStatus(ctx context.Context) (*dto.AdminTelegramStatusResponse, error)
+
 	// Bot Update Processors
 	ProcessClinicBotUpdate(ctx context.Context, update *telegram.Update) error
 	ProcessAdminBotUpdate(ctx context.Context, update *telegram.Update) error
@@ -115,7 +118,7 @@ func (s *telegramService) GenerateClinicLinkingToken(ctx context.Context, clinic
 	hasher.Write([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hasher.Sum(nil))
 
-	expiresAt := time.Now().Add(15 * time.Minute)
+	expiresAt := time.Now().UTC().Add(15 * time.Minute)
 	tokenRecord := &models.TelegramLinkingToken{
 		ID:        uuid.New(),
 		ClinicID:  clinicID,
@@ -129,7 +132,10 @@ func (s *telegramService) GenerateClinicLinkingToken(ctx context.Context, clinic
 		return nil, fmt.Errorf("tokenni saqlashda xatolik: %w", err)
 	}
 
-	botUsername := s.cfg.TelegramClinicBotUsername
+	botUsername := strings.TrimPrefix(strings.TrimSpace(s.cfg.TelegramClinicBotUsername), "@")
+	if botUsername == "" {
+		botUsername = "qabulgo_clinic_bot"
+	}
 	deepLink := fmt.Sprintf("https://t.me/%s?start=%s", botUsername, rawToken)
 
 	return &dto.TelegramLinkTokenResponse{
@@ -206,6 +212,24 @@ func (s *telegramService) ToggleClinicNotifications(ctx context.Context, clinicI
 	}, nil
 }
 
+func (s *telegramService) GetAdminTelegramStatus(ctx context.Context) (*dto.AdminTelegramStatusResponse, error) {
+	botUsername := strings.TrimPrefix(strings.TrimSpace(s.cfg.TelegramAdminBotUsername), "@")
+	if botUsername == "" {
+		botUsername = "qabulgo_admin_bot"
+	}
+
+	deepLink := fmt.Sprintf("https://t.me/%s", botUsername)
+	isConfigured := s.cfg.TelegramAdminBotToken != ""
+
+	return &dto.AdminTelegramStatusResponse{
+		IsConfigured:    isConfigured,
+		BotUsername:     botUsername,
+		BotName:         "QabulGo Admin Bot",
+		DeepLink:        deepLink,
+		AllowedAdminIDs: s.cfg.TelegramAdminAllowedIDs,
+	}, nil
+}
+
 // ----------------------------------------------------------------------------
 // 2. Clinic Bot Logic & Update Handlers
 // ----------------------------------------------------------------------------
@@ -238,27 +262,50 @@ func (s *telegramService) handleClinicMessage(ctx context.Context, msg *telegram
 	}
 
 	text := strings.TrimSpace(msg.Text)
+	if text == "" {
+		return nil
+	}
 	chatID := msg.Chat.ID
 	fromUser := msg.From
 	if fromUser == nil {
 		return nil
 	}
 
-	// 1. Check Deep Linking Token (/start <token>)
-	if strings.HasPrefix(text, "/start ") {
-		tokenParam := strings.TrimSpace(strings.TrimPrefix(text, "/start "))
-		return s.completeClinicLinking(ctx, chatID, fromUser, tokenParam)
+	// Split message into command and arguments
+	fields := strings.Fields(text)
+	rawCmd := fields[0]
+	cmd := strings.ToLower(rawCmd)
+	if atIdx := strings.Index(cmd, "@"); atIdx != -1 {
+		cmd = cmd[:atIdx]
 	}
 
-	switch text {
-	case "/start":
+	var arg string
+	if len(fields) > 1 {
+		arg = strings.TrimSpace(fields[1])
+	}
+
+	// 1. Deep Linking Token (/start <token> or /start@bot <token>)
+	if cmd == "/start" && arg != "" {
+		return s.completeClinicLinking(ctx, chatID, fromUser, arg)
+	}
+
+	// 2. Plain /start or interactive commands
+	if cmd == "/start" {
 		clinics, err := s.telegramRepo.GetClinicsByTelegramUserID(ctx, fromUser.ID)
 		if err != nil || len(clinics) == 0 {
-			replyText := "👋 <b>Assalomu alaykum!</b>\n\nBu <b>QabulGo Clinic Bot</b> — klinika xodimlari uchun xabarnomalar boti.\n\n" +
-				"⚠️ Sizning Telegram akkauntingiz hali hech qaysi klinikaga ulanmagan.\n" +
-				"Ulanish uchun QabulGo klinika kabinetingizdagi <b>Telegram bot</b> bo‘limiga kiring va «Telegram botni ulash» tugmasini bosing."
-			_, _ = s.clinicBotClient.SendMessage(ctx, chatID, replyText, nil)
-			return nil
+			replyText := fmt.Sprintf("👋 <b>Assalomu alaykum, %s!</b>\n\n"+
+				"Bu <b>QabulGo Clinic Bot</b> — klinika xodimlari uchun xabarnomalar boti.\n\n"+
+				"⚠️ Sizning Telegram akkauntingiz hali hech qaysi klinikaga ulanmagan.\n\n"+
+				"<b>Ulanish uchun:</b>\n"+
+				"1. QabulGo klinika kabinetingizga kiring\n"+
+				"2. Chap menyudan <b>Telegram bot</b> bo‘limini oching\n"+
+				"3. <b>«Telegram botni ulash»</b> tugmasini bosing\n\n"+
+				"Savollar bo‘lsa, /help buyrug‘ini yuboring.", fromUser.FirstName)
+			_, sendErr := s.clinicBotClient.SendMessage(ctx, chatID, replyText, nil)
+			if sendErr != nil {
+				log.Printf("[Telegram Clinic Bot] SendMessage xatoligi (chatID=%d): %v\n", chatID, sendErr)
+			}
+			return sendErr
 		}
 
 		clinicNames := make([]string, 0, len(clinics))
@@ -270,19 +317,24 @@ func (s *telegramService) handleClinicMessage(ctx context.Context, msg *telegram
 			fromUser.FirstName, strings.Join(clinicNames, "\n"))
 
 		markup := s.buildClinicMenuMarkup()
-		_, _ = s.clinicBotClient.SendMessage(ctx, chatID, replyText, markup)
-		return nil
+		_, sendErr := s.clinicBotClient.SendMessage(ctx, chatID, replyText, markup)
+		if sendErr != nil {
+			log.Printf("[Telegram Clinic Bot] SendMessage xatoligi (chatID=%d): %v\n", chatID, sendErr)
+		}
+		return sendErr
+	}
 
-	case "/today", "📅 Bugungi bronlar":
+	switch {
+	case cmd == "/today" || text == "📅 Bugungi bronlar":
 		return s.sendClinicAppointmentsForDate(ctx, chatID, fromUser.ID, s.getTashkentDateOffset(0), "Bugungi")
 
-	case "/tomorrow", "🗓 Ertangi bronlar":
+	case cmd == "/tomorrow" || text == "🗓 Ertangi bronlar":
 		return s.sendClinicAppointmentsForDate(ctx, chatID, fromUser.ID, s.getTashkentDateOffset(1), "Ertangi")
 
-	case "/appointments", "📋 Kelgusi bronlar":
+	case cmd == "/appointments" || text == "📋 Kelgusi bronlar":
 		return s.sendClinicUpcomingAppointments(ctx, chatID, fromUser.ID, 0)
 
-	case "/help", "ℹ️ Yordam":
+	case cmd == "/help" || text == "ℹ️ Yordam":
 		helpText := "<b>QabulGo Clinic Bot buyruqlari:</b>\n\n" +
 			"/today — Bugungi kun qabullari\n" +
 			"/tomorrow — Ertangi kun qabullari\n" +
@@ -290,20 +342,39 @@ func (s *telegramService) handleClinicMessage(ctx context.Context, msg *telegram
 			"/start — Ulanish holati va asosiy menyu\n" +
 			"/help — Yordam ma’lumotlari\n\n" +
 			"Savollar bo‘lsa, sayt orqali texnik ko‘makka murojaat qiling."
-		_, _ = s.clinicBotClient.SendMessage(ctx, chatID, helpText, s.buildClinicMenuMarkup())
+		_, sendErr := s.clinicBotClient.SendMessage(ctx, chatID, helpText, s.buildClinicMenuMarkup())
+		return sendErr
+
+	default:
+		// Not recognized command - provide friendly fallback instead of silence
+		clinics, _ := s.telegramRepo.GetClinicsByTelegramUserID(ctx, fromUser.ID)
+		if len(clinics) > 0 {
+			replyText := "ℹ️ Iltimos, quyidagi menyu buyruqlaridan foydalaning yoki /help deb yozing:"
+			_, _ = s.clinicBotClient.SendMessage(ctx, chatID, replyText, s.buildClinicMenuMarkup())
+		} else {
+			replyText := "👋 <b>QabulGo Clinic Bot</b>\n\n" +
+				"⚠️ Akkauntingiz klinikaga ulanmagan. Iltimos, klinika kabinetingizdan <b>Telegram bot</b> bo‘limiga kirib ulaning."
+			_, _ = s.clinicBotClient.SendMessage(ctx, chatID, replyText, nil)
+		}
 		return nil
 	}
-
-	return nil
 }
 
 func (s *telegramService) completeClinicLinking(ctx context.Context, chatID int64, fromUser *telegram.User, rawToken string) error {
+	rawToken = strings.TrimSpace(rawToken)
+	if rawToken == "" {
+		replyText := "❌ <b>Ulanish kodi topilmadi.</b>\n\nIltimos, QabulGo klinika kabinetidagi «Telegram botni ulash» tugmasi orqali qaytadan urinib ko‘ring."
+		_, _ = s.clinicBotClient.SendMessage(ctx, chatID, replyText, nil)
+		return nil
+	}
+
 	hasher := sha256.New()
 	hasher.Write([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hasher.Sum(nil))
 
 	tokenRecord, err := s.telegramRepo.GetValidLinkingTokenByHash(ctx, tokenHash)
 	if err != nil {
+		log.Printf("[Telegram Clinic Bot] Linking token topilmadi yoki muddati o'tgan (hash: %s): %v\n", tokenHash, err)
 		replyText := "❌ <b>Ulanish kodi yaroqsiz yoki muddati o‘tgan.</b>\n\nIltimos, QabulGo klinika kabinetidan yangi havola oling."
 		_, _ = s.clinicBotClient.SendMessage(ctx, chatID, replyText, nil)
 		return nil
@@ -415,7 +486,7 @@ func (s *telegramService) sendClinicAppointmentsForDate(ctx context.Context, cha
 				{
 					{
 						Text: "🌐 Saytda to‘liq ko‘rish",
-						URL:  fmt.Sprintf("%s/clinic/appointments", s.cfg.AppPublicURL),
+						URL:  s.buildWebURL("/clinic/appointments"),
 					},
 				},
 			},
@@ -500,7 +571,7 @@ func (s *telegramService) sendClinicUpcomingAppointments(ctx context.Context, ch
 		rows = append(rows, []telegram.InlineKeyboardButton{
 			{
 				Text: "🌐 Saytda ko‘rish",
-				URL:  fmt.Sprintf("%s/clinic/appointments", s.cfg.AppPublicURL),
+				URL:  s.buildWebURL("/clinic/appointments"),
 			},
 		})
 
@@ -520,7 +591,7 @@ func (s *telegramService) buildClinicMenuMarkup() *telegram.InlineKeyboardMarkup
 			},
 			{
 				{Text: "📋 Kelgusi bronlar", CallbackData: "cb:clinic_upcoming:0"},
-				{Text: "🌐 Saytga o‘tish", URL: fmt.Sprintf("%s/clinic/appointments", s.cfg.AppPublicURL)},
+				{Text: "🌐 Saytga o‘tish", URL: s.buildWebURL("/clinic/appointments")},
 			},
 		},
 	}
@@ -576,17 +647,26 @@ func (s *telegramService) handleAdminMessage(ctx context.Context, msg *telegram.
 
 	// Authorization Check
 	if !s.isAuthorizedAdmin(fromUser.ID) {
-		_, _ = s.adminBotClient.SendMessage(ctx, chatID,
-			"⛔️ <b>Ruxsat etilmagan!</b>\n\nSizda QabulGo Nazorat Markazi (Superadmin) botidan foydalanish huquqi yo‘q.", nil)
+		text := fmt.Sprintf("⛔️ <b>Ruxsat etilmagan!</b>\n\nSizda QabulGo Nazorat Markazi (Superadmin) botidan foydalanish huquqi yo‘q.\n\nSizning Telegram ID raqamingiz: <code>%d</code>\nUshbu ID'ni backend .env faylidagi <code>%s</code> sozlamasiga qo‘shing.", fromUser.ID, "TELEGRAM_ADMIN_ALLOWED_IDS")
+		_, _ = s.adminBotClient.SendMessage(ctx, chatID, text, nil)
 		return nil
 	}
 
 	text := strings.TrimSpace(msg.Text)
+	if text == "" {
+		return nil
+	}
+
+	fields := strings.Fields(text)
+	cmd := strings.ToLower(fields[0])
+	if atIdx := strings.Index(cmd, "@"); atIdx != -1 {
+		cmd = cmd[:atIdx]
+	}
 
 	// Check if in active interactive session (e.g. awaiting rejection reason)
 	session, _ := s.telegramRepo.GetAdminSession(ctx, fromUser.ID)
 	if session != nil && session.AwaitingAction == "reject_clinic" && session.TargetClinicID != nil {
-		if text == "/cancel" {
+		if cmd == "/cancel" || text == "/cancel" {
 			_ = s.telegramRepo.ClearAdminSession(ctx, fromUser.ID)
 			_, _ = s.adminBotClient.SendMessage(ctx, chatID, "Amal bekor qilindi.", s.buildAdminMenuMarkup())
 			return nil
@@ -623,7 +703,7 @@ func (s *telegramService) handleAdminMessage(ctx context.Context, msg *telegram.
 				{
 					{
 						Text: "🌐 Saytda ko‘rish",
-						URL:  fmt.Sprintf("%s/admin/clinics?clinicId=%s", s.cfg.AppPublicURL, clinicID.String()),
+						URL:  s.buildWebURL(fmt.Sprintf("/admin/clinics?clinicId=%s", clinicID.String())),
 					},
 				},
 			},
@@ -633,26 +713,31 @@ func (s *telegramService) handleAdminMessage(ctx context.Context, msg *telegram.
 		return nil
 	}
 
-	switch text {
-	case "/start":
+	switch {
+	case cmd == "/start":
 		welcomeText := fmt.Sprintf("🛡 <b>QabulGo Nazorat Markazi (Superadmin Bot)</b>\n\nAssalomu alaykum, <b>%s</b>!\n\n"+
 			"Ushbu bot orqali siz yangi klinika arizalarini ko‘rib chiqishingiz, tasdiqlashingiz yoki rad etishingiz mumkin.", fromUser.FirstName)
 		_, _ = s.adminBotClient.SendMessage(ctx, chatID, welcomeText, s.buildAdminMenuMarkup())
 		return nil
 
-	case "/pending", "⏳ Kutilayotgan klinikalar":
+	case cmd == "/pending" || text == "⏳ Kutilayotgan klinikalar":
 		return s.sendAdminPendingClinics(ctx, chatID, 0)
 
-	case "/approved", "✅ Tasdiqlangan klinikalar":
+	case cmd == "/approved" || text == "✅ Tasdiqlangan klinikalar":
 		return s.sendAdminApprovedClinics(ctx, chatID)
 
-	case "/help", "ℹ️ Yordam":
+	case cmd == "/help" || text == "ℹ️ Yordam":
 		helpText := "<b>Superadmin Bot buyruqlari:</b>\n\n" +
 			"/pending — Tasdiqlash kutilayotgan klinikalar arizalari\n" +
 			"/approved — Yaqinda tasdiqlangan klinikalar\n" +
 			"/start — Asosiy menyu\n" +
 			"/cancel — Joriy amalni bekor qilish"
 		_, _ = s.adminBotClient.SendMessage(ctx, chatID, helpText, s.buildAdminMenuMarkup())
+		return nil
+
+	default:
+		replyText := "ℹ️ Iltimos, quyidagi menyu buyruqlaridan foydalaning yoki /help deb yozing:"
+		_, _ = s.adminBotClient.SendMessage(ctx, chatID, replyText, s.buildAdminMenuMarkup())
 		return nil
 	}
 
@@ -711,7 +796,7 @@ func (s *telegramService) handleAdminCallbackQuery(ctx context.Context, cb *tele
 				{
 					{
 						Text: "🌐 Saytda ko‘rish",
-						URL:  fmt.Sprintf("%s/admin/clinics?clinicId=%s", s.cfg.AppPublicURL, clinic.ID.String()),
+						URL:  s.buildWebURL(fmt.Sprintf("/admin/clinics?clinicId=%s", clinic.ID.String())),
 					},
 				},
 			},
@@ -766,6 +851,12 @@ func (s *telegramService) handleAdminCallbackQuery(ctx context.Context, cb *tele
 		return s.sendAdminPendingClinics(ctx, chatID, offset)
 	}
 
+	// 4. Approved Clinics List
+	if data == "cb:admin_approved" || strings.HasPrefix(data, "cb:admin_approved:") {
+		_ = s.adminBotClient.AnswerCallbackQuery(ctx, cb.ID, "", false)
+		return s.sendAdminApprovedClinics(ctx, chatID)
+	}
+
 	return nil
 }
 
@@ -809,7 +900,7 @@ func (s *telegramService) sendAdminPendingClinics(ctx context.Context, chatID in
 				{
 					{
 						Text: "🌐 Saytda to‘liq ko‘rish",
-						URL:  fmt.Sprintf("%s/admin/clinics?clinicId=%s", s.cfg.AppPublicURL, c.ID.String()),
+						URL:  s.buildWebURL(fmt.Sprintf("/admin/clinics?clinicId=%s", c.ID.String())),
 					},
 				},
 			},
@@ -862,7 +953,7 @@ func (s *telegramService) sendAdminApprovedClinics(ctx context.Context, chatID i
 	}
 
 	if total == 0 {
-		_, _ = s.adminBotClient.SendMessage(ctx, chatID, "Hozircha tasdiqlangan klinikalar yo‘q.", nil)
+		_, _ = s.adminBotClient.SendMessage(ctx, chatID, "Hozircha tasdiqlangan klinikalar yo‘q.", s.buildAdminMenuMarkup())
 		return nil
 	}
 
@@ -875,7 +966,7 @@ func (s *telegramService) sendAdminApprovedClinics(ctx context.Context, chatID i
 	markup := &telegram.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telegram.InlineKeyboardButton{
 			{
-				{Text: "🌐 Admin panelga o‘tish", URL: fmt.Sprintf("%s/admin/clinics", s.cfg.AppPublicURL)},
+				{Text: "🌐 Admin panelga o‘tish", URL: s.buildWebURL("/admin/clinics")},
 			},
 		},
 	}
@@ -892,7 +983,7 @@ func (s *telegramService) buildAdminMenuMarkup() *telegram.InlineKeyboardMarkup 
 				{Text: "✅ Tasdiqlangan klinikalar", CallbackData: "cb:admin_approved"},
 			},
 			{
-				{Text: "🌐 Admin panelga o‘tish", URL: fmt.Sprintf("%s/admin/clinics", s.cfg.AppPublicURL)},
+				{Text: "🌐 Admin panelga o‘tish", URL: s.buildWebURL("/admin/clinics")},
 			},
 		},
 	}
@@ -978,7 +1069,7 @@ func (s *telegramService) dispatchAppointmentCreated(ctx context.Context, item *
 			{
 				{
 					Text: "🌐 Saytga o‘tish",
-					URL:  fmt.Sprintf("%s/clinic/appointments/%s", s.cfg.AppPublicURL, data.AppointmentID),
+					URL:  s.buildWebURL(fmt.Sprintf("/clinic/appointments/%s", data.AppointmentID)),
 				},
 			},
 		},
@@ -1051,7 +1142,7 @@ func (s *telegramService) dispatchAppointmentCancelled(ctx context.Context, item
 			{
 				{
 					Text: "🌐 Saytga o‘tish",
-					URL:  fmt.Sprintf("%s/clinic/appointments/%s", s.cfg.AppPublicURL, data.AppointmentID),
+					URL:  s.buildWebURL(fmt.Sprintf("/clinic/appointments/%s", data.AppointmentID)),
 				},
 			},
 		},
@@ -1120,7 +1211,7 @@ func (s *telegramService) dispatchClinicSubmitted(ctx context.Context, item *mod
 			{
 				{
 					Text: "🌐 Saytga o‘tish",
-					URL:  fmt.Sprintf("%s/admin/clinics?clinicId=%s", s.cfg.AppPublicURL, data.ClinicID),
+					URL:  s.buildWebURL(fmt.Sprintf("/admin/clinics?clinicId=%s", data.ClinicID)),
 				},
 			},
 		},
@@ -1146,6 +1237,41 @@ func (s *telegramService) dispatchClinicSubmitted(ctx context.Context, item *mod
 // ----------------------------------------------------------------------------
 
 func (s *telegramService) StartPolling(ctx context.Context) {
+	// 1. Clinic Bot initialization & health check
+	if s.clinicBotClient != nil {
+		me, err := s.clinicBotClient.GetMe(ctx)
+		if err != nil {
+			if errors.Is(err, telegram.ErrUnauthorized) {
+				log.Println("❌ [Telegram Clinic Bot] 401 Unauthorized: TELEGRAM_CLINIC_BOT_TOKEN noto'g'ri!")
+			} else {
+				log.Printf("⚠️ [Telegram Clinic Bot] getMe tekshiruvida ogohlantirish: %v\n", err)
+			}
+		} else {
+			log.Printf("✅ [Telegram Clinic Bot] Ulandi: @%s (%s, ID: %d)\n", me.Username, me.FirstName, me.ID)
+		}
+	}
+
+	// 2. Admin Bot initialization & health check
+	if s.adminBotClient != nil && s.cfg.TelegramClinicBotToken != s.cfg.TelegramAdminBotToken {
+		me, err := s.adminBotClient.GetMe(ctx)
+		if err != nil {
+			if errors.Is(err, telegram.ErrUnauthorized) {
+				log.Println("❌ [Telegram Admin Bot] 401 Unauthorized: TELEGRAM_ADMIN_BOT_TOKEN noto'g'ri!")
+			} else {
+				log.Printf("⚠️ [Telegram Admin Bot] getMe tekshiruvida ogohlantirish: %v\n", err)
+			}
+		} else {
+			log.Printf("✅ [Telegram Admin Bot] Ulandi: @%s (%s, ID: %d)\n", me.Username, me.FirstName, me.ID)
+		}
+	}
+
+	// 3. Prevent duplicate polling instance if identical tokens are configured (409 Conflict prevention)
+	if s.cfg.TelegramClinicBotToken != "" && s.cfg.TelegramClinicBotToken == s.cfg.TelegramAdminBotToken {
+		log.Println("ℹ️ [Telegram] Clinic Bot va Admin Bot uchun bir xil token sozlangan. 409 Conflict oldini olish uchun yagona birlashtirilgan polling ishga tushiriladi.")
+		go s.pollUnifiedBot(ctx)
+		return
+	}
+
 	if s.clinicBotClient != nil {
 		go s.pollClinicBot(ctx)
 	}
@@ -1166,6 +1292,19 @@ func (s *telegramService) pollClinicBot(ctx context.Context) {
 		default:
 			updates, err := s.clinicBotClient.GetUpdates(ctx, offset, 50, 25)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				if errors.Is(err, telegram.ErrConflict) {
+					log.Println("⚠️ [Telegram Clinic Bot] 409 Conflict: Boshqa polling instansiyasi ishlab turibdi! Iltimos, boshqa terminal yoki jarayonlarni tekshiring. 5 soniya kutilmoqda...")
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				if errors.Is(err, telegram.ErrUnauthorized) {
+					log.Println("❌ [Telegram Clinic Bot] 401 Unauthorized: TELEGRAM_CLINIC_BOT_TOKEN bekor qilingan yoki noto'g'ri! Polling to'xtatilmoqda.")
+					return
+				}
+				log.Printf("⚠️ [Telegram Clinic Bot] getUpdates xatosi: %v (3 soniyadan so'ng qayta uriniladi)\n", err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
@@ -1174,7 +1313,9 @@ func (s *telegramService) pollClinicBot(ctx context.Context) {
 				if u.UpdateID >= offset {
 					offset = u.UpdateID + 1
 				}
-				_ = s.ProcessClinicBotUpdate(ctx, &u)
+				if err := s.ProcessClinicBotUpdate(ctx, &u); err != nil {
+					log.Printf("⚠️ [Telegram Clinic Bot] Update %d ni qayta ishlashda xatolik: %v\n", u.UpdateID, err)
+				}
 			}
 		}
 	}
@@ -1192,6 +1333,19 @@ func (s *telegramService) pollAdminBot(ctx context.Context) {
 		default:
 			updates, err := s.adminBotClient.GetUpdates(ctx, offset, 50, 25)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				if errors.Is(err, telegram.ErrConflict) {
+					log.Println("⚠️ [Telegram Admin Bot] 409 Conflict: Boshqa polling instansiyasi ishlab turibdi! Iltimos, boshqa terminal yoki jarayonlarni tekshiring. 5 soniya kutilmoqda...")
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				if errors.Is(err, telegram.ErrUnauthorized) {
+					log.Println("❌ [Telegram Admin Bot] 401 Unauthorized: TELEGRAM_ADMIN_BOT_TOKEN bekor qilingan yoki noto'g'ri! Polling to'xtatilmoqda.")
+					return
+				}
+				log.Printf("⚠️ [Telegram Admin Bot] getUpdates xatosi: %v (3 soniyadan so'ng qayta uriniladi)\n", err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
@@ -1200,13 +1354,82 @@ func (s *telegramService) pollAdminBot(ctx context.Context) {
 				if u.UpdateID >= offset {
 					offset = u.UpdateID + 1
 				}
-				_ = s.ProcessAdminBotUpdate(ctx, &u)
+				if err := s.ProcessAdminBotUpdate(ctx, &u); err != nil {
+					log.Printf("⚠️ [Telegram Admin Bot] Update %d ni qayta ishlashda xatolik: %v\n", u.UpdateID, err)
+				}
 			}
 		}
 	}
 }
 
+func (s *telegramService) pollUnifiedBot(ctx context.Context) {
+	log.Println("Telegram Unified (Clinic + Admin) Bot polling boshlandi...")
+	var offset int64 = 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Telegram Unified Bot polling to‘xtatildi.")
+			return
+		default:
+			updates, err := s.clinicBotClient.GetUpdates(ctx, offset, 50, 25)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				if errors.Is(err, telegram.ErrConflict) {
+					log.Println("⚠️ [Telegram Unified Bot] 409 Conflict: Boshqa polling instansiyasi ishlab turibdi! 5 soniya kutilmoqda...")
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				if errors.Is(err, telegram.ErrUnauthorized) {
+					log.Println("❌ [Telegram Unified Bot] 401 Unauthorized: Bot tokeni noto'g'ri! Polling to'xtatilmoqda.")
+					return
+				}
+				log.Printf("⚠️ [Telegram Unified Bot] getUpdates xatosi: %v (3 soniyadan so'ng qayta uriniladi)\n", err)
+				time.Sleep(3 * time.Second)
+				continue
+			}
+
+			for _, u := range updates {
+				if u.UpdateID >= offset {
+					offset = u.UpdateID + 1
+				}
+				// Route update to admin or clinic
+				if u.CallbackQuery != nil && strings.HasPrefix(u.CallbackQuery.Data, "cb:admin_") {
+					_ = s.ProcessAdminBotUpdate(ctx, &u)
+				} else if u.Message != nil && (strings.HasPrefix(strings.TrimSpace(u.Message.Text), "/pending") ||
+					strings.HasPrefix(strings.TrimSpace(u.Message.Text), "/approved") ||
+					s.hasAdminSession(ctx, u.Message.From)) {
+					_ = s.ProcessAdminBotUpdate(ctx, &u)
+				} else {
+					_ = s.ProcessClinicBotUpdate(ctx, &u)
+				}
+			}
+		}
+	}
+}
+
+func (s *telegramService) hasAdminSession(ctx context.Context, user *telegram.User) bool {
+	if user == nil {
+		return false
+	}
+	session, err := s.telegramRepo.GetAdminSession(ctx, user.ID)
+	return err == nil && session != nil && session.AwaitingAction != ""
+}
+
 // Helpers
+func (s *telegramService) buildWebURL(path string) string {
+	baseURL := strings.TrimRight(strings.TrimSpace(s.cfg.AppPublicURL), "/")
+	if baseURL == "" || strings.Contains(baseURL, "localhost") || strings.Contains(baseURL, "127.0.0.1") || strings.Contains(baseURL, "::1") {
+		baseURL = "https://qabulgo.uz"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return baseURL + path
+}
+
 func (s *telegramService) getTashkentDateOffset(dayOffset int) string {
 	loc, err := time.LoadLocation("Asia/Tashkent")
 	if err != nil {

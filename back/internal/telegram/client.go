@@ -16,6 +16,8 @@ var (
 	ErrBotBlockedByUser = errors.New("bot foydalanuvchi tomonidan bloklangan (403 Forbidden)")
 	ErrChatNotFound     = errors.New("chat topilmadi (400 Bad Request)")
 	ErrTooManyRequests  = errors.New("telegram rate limit cheklovi (429 Too Many Requests)")
+	ErrUnauthorized     = errors.New("telegram bot tokeni noto'g'ri (401 Unauthorized)")
+	ErrConflict         = errors.New("telegram polling ziddiyati - boshqa instansiya ishlab turibdi (409 Conflict)")
 )
 
 type Client interface {
@@ -81,8 +83,14 @@ func (c *client) makeRequest(ctx context.Context, method string, payload any, re
 		return fmt.Errorf("telegram javobini o'qishda xatolik: %w", err)
 	}
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return ErrUnauthorized
+	}
 	if resp.StatusCode == http.StatusForbidden {
 		return ErrBotBlockedByUser
+	}
+	if resp.StatusCode == http.StatusConflict {
+		return ErrConflict
 	}
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
@@ -101,7 +109,10 @@ func (c *client) GetMe(ctx context.Context) (*User, error) {
 		return nil, err
 	}
 	if !resp.Ok {
-		return nil, fmt.Errorf("telegram getMe muvaffaqiyatsiz: %s", resp.Description)
+		if resp.ErrorCode == 401 || strings.Contains(strings.ToLower(resp.Description), "unauthorized") {
+			return nil, ErrUnauthorized
+		}
+		return nil, fmt.Errorf("telegram getMe muvaffaqiyatsiz (kod %d): %s", resp.ErrorCode, resp.Description)
 	}
 	return &resp.Result, nil
 }
@@ -176,7 +187,13 @@ func (c *client) GetUpdates(ctx context.Context, offset int64, limit int, timeou
 		return nil, err
 	}
 	if !resp.Ok {
-		return nil, fmt.Errorf("telegram getUpdates muvaffaqiyatsiz: %s", resp.Description)
+		if resp.ErrorCode == 401 || strings.Contains(strings.ToLower(resp.Description), "unauthorized") {
+			return nil, ErrUnauthorized
+		}
+		if resp.ErrorCode == 409 || strings.Contains(strings.ToLower(resp.Description), "conflict") {
+			return nil, ErrConflict
+		}
+		return nil, fmt.Errorf("telegram getUpdates muvaffaqiyatsiz (kod %d): %s", resp.ErrorCode, resp.Description)
 	}
 	return resp.Result, nil
 }

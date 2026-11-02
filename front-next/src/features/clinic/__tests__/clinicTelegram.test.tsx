@@ -51,6 +51,10 @@ describe('ClinicTelegramPage Component', () => {
         updated_at: new Date().toISOString(),
         doctors_count: 5,
         working_hours: [],
+        description: 'Test klinikasi',
+        email: 'shifo@med.uz',
+        logo_url: '',
+        cover_image_url: '',
       },
       isLoadingClinic: false,
     });

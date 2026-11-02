@@ -183,6 +183,10 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 				admin.POST("/clinics/:id/approve", rc.AdminHandler.ApproveClinic)
 				admin.POST("/clinics/:id/reject", rc.AdminHandler.RejectClinic)
 				admin.POST("/clinics/:id/suspend", rc.AdminHandler.SuspendClinic)
+
+				if rc.TelegramHandler != nil {
+					admin.GET("/telegram/status", rc.TelegramHandler.GetAdminStatus)
+				}
 			}
 		}
 

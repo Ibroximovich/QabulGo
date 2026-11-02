@@ -54,9 +54,24 @@ export function ClinicTelegramPage() {
       return res.data?.data;
     },
     onSuccess: (data) => {
-      if (data?.deep_link) {
-        window.open(data.deep_link, '_blank');
-        toast.success('Telegram ochilmoqda. Iltimos botda "Start" tugmasini bosing!');
+      if (data?.deep_link && typeof window !== 'undefined') {
+        try {
+          const opened = window.open(data.deep_link, '_blank');
+          if (opened) {
+            toast.success('Telegram ochilmoqda. Iltimos botda "Start" tugmasini bosing!');
+          } else {
+            toast.info('Telegram havolasi tayyor', {
+              action: {
+                label: 'Botga o‘tish',
+                onClick: () => {
+                  window.location.href = data.deep_link;
+                },
+              },
+            });
+          }
+        } catch {
+          // ignore window open exceptions
+        }
       }
     },
     onError: (err: any) => {

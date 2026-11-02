@@ -139,3 +139,14 @@ func (h *TelegramHandler) ToggleNotifications(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Xabarnoma holati yangilandi", updated))
 }
+
+// GetAdminStatus returns the Telegram Superadmin Bot configuration status
+func (h *TelegramHandler) GetAdminStatus(c *gin.Context) {
+	resp, err := h.telegramService.GetAdminTelegramStatus(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("Admin bot statusini olishda xatolik: "+err.Error(), nil))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.NewSuccessResponse("Admin Telegram holati olindi", resp))
+}

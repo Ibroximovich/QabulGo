@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShieldCheck, Building2, LogOut } from 'lucide-react';
+import { ShieldCheck, Building2, LogOut, Send } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { Button } from '@/components/ui/Button';
@@ -69,6 +69,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             >
               <Building2 className="w-5 h-5 shrink-0" />
               <span>Klinikalar</span>
+            </Link>
+
+            <Link
+              href="/admin/telegram"
+              className={cn(
+                'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                pathname === '/admin/telegram'
+                  ? 'bg-[#0866F5] text-white shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-100'
+              )}
+            >
+              <Send className="w-5 h-5 shrink-0 text-[#229ED9]" />
+              <span>Telegram bot</span>
             </Link>
           </nav>
         </aside>

@@ -32,3 +32,12 @@ type ClinicTelegramStatusResponse struct {
 	Recipients  []ClinicTelegramRecipientDTO `json:"recipients"`
 }
 
+// AdminTelegramStatusResponse represents superadmin bot status
+type AdminTelegramStatusResponse struct {
+	IsConfigured    bool    `json:"is_configured"`
+	BotUsername     string  `json:"bot_username"`
+	BotName         string  `json:"bot_name"`
+	DeepLink        string  `json:"deep_link"`
+	AllowedAdminIDs []int64 `json:"allowed_admin_ids"`
+}
+

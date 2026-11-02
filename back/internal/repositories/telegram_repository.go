@@ -53,9 +53,10 @@ func (r *telegramRepository) CreateLinkingToken(ctx context.Context, token *mode
 
 func (r *telegramRepository) GetValidLinkingTokenByHash(ctx context.Context, tokenHash string) (*models.TelegramLinkingToken, error) {
 	var token models.TelegramLinkingToken
+	nowUTC := time.Now().UTC()
 	err := r.db.WithContext(ctx).
 		Preload("Clinic").
-		Where("token_hash = ? AND is_used = false AND expires_at > ?", tokenHash, time.Now()).
+		Where("token_hash = ? AND is_used = false AND expires_at > ?", tokenHash, nowUTC).
 		First(&token).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -162,7 +163,7 @@ func (r *telegramRepository) GetClinicsByTelegramUserID(ctx context.Context, tel
 	err := r.db.WithContext(ctx).
 		Table("clinics").
 		Joins("JOIN clinic_telegram_recipients ctr ON ctr.clinic_id = clinics.id").
-		Where("ctr.telegram_user_id = ? AND ctr.is_active = true", telegramUserID).
+		Where("(ctr.telegram_user_id = ? OR ctr.telegram_chat_id = ?) AND ctr.is_active = true", telegramUserID, telegramUserID).
 		Distinct().
 		Find(&clinics).Error
 	return clinics, err

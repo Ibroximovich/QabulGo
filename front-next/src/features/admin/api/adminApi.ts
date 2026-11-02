@@ -28,6 +28,14 @@ export interface AdminClinicListResponse {
   };
 }
 
+export interface AdminTelegramStatusResponse {
+  is_configured: boolean;
+  bot_username: string;
+  bot_name: string;
+  deep_link: string;
+  allowed_admin_ids: number[];
+}
+
 export const adminApi = {
   login(payload: AdminLoginPayload) {
     return apiClient.post<ApiResponse<LoginData>>('/auth/admin/login', payload);
@@ -53,6 +61,10 @@ export const adminApi = {
 
   suspendClinic(id: string, reason: string) {
     return apiClient.post<ApiResponse<null>>(`/admin/clinics/${id}/suspend`, { reason });
+  },
+
+  getTelegramStatus() {
+    return apiClient.get<ApiResponse<AdminTelegramStatusResponse>>('/admin/telegram/status');
   },
 };
 
