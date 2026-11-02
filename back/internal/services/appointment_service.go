@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -47,6 +48,7 @@ type appointmentService struct {
 	scheduleRepo    repositories.ScheduleRepository
 	clinicRepo      repositories.ClinicRepository
 	auditRepo       repositories.AuditRepository
+	outboxRepo      repositories.OutboxRepository
 }
 
 func NewAppointmentService(
@@ -54,13 +56,18 @@ func NewAppointmentService(
 	scheduleRepo repositories.ScheduleRepository,
 	clinicRepo repositories.ClinicRepository,
 	auditRepo repositories.AuditRepository,
+	outboxRepo ...repositories.OutboxRepository,
 ) AppointmentService {
-	return &appointmentService{
+	svc := &appointmentService{
 		appointmentRepo: appointmentRepo,
 		scheduleRepo:    scheduleRepo,
 		clinicRepo:      clinicRepo,
 		auditRepo:       auditRepo,
 	}
+	if len(outboxRepo) > 0 {
+		svc.outboxRepo = outboxRepo[0]
+	}
+	return svc
 }
 
 var (
@@ -257,6 +264,53 @@ func (s *appointmentService) BookAppointment(
 		return mapAppointmentToDTO(newAppt, true), nil
 	}
 
+	// 12. Enqueue Outbox Notification for Clinic Telegram Bot
+	if s.outboxRepo != nil {
+		clinicName := ""
+		if createdAppt.Clinic != nil {
+			clinicName = createdAppt.Clinic.Name
+		}
+		patientName := "Bemor"
+		patientPhone := ""
+		if createdAppt.Patient != nil {
+			patientName = fmt.Sprintf("%s %s", createdAppt.Patient.FirstName, createdAppt.Patient.LastName)
+			patientPhone = createdAppt.Patient.Phone
+		}
+		doctorName := "Shifokor"
+		specialtyName := ""
+		if createdAppt.Doctor != nil {
+			doctorName = fmt.Sprintf("%s %s", createdAppt.Doctor.FirstName, createdAppt.Doctor.LastName)
+		}
+		if cd.Specialty != nil {
+			specialtyName = cd.Specialty.Name
+		}
+
+		payloadBytes, _ := json.Marshal(map[string]any{
+			"appointment_id": createdAppt.ID.String(),
+			"clinic_id":      createdAppt.ClinicID.String(),
+			"clinic_name":    clinicName,
+			"patient_name":   patientName,
+			"patient_phone":  patientPhone,
+			"doctor_name":    doctorName,
+			"specialty":      specialtyName,
+			"date":           createdAppt.AppointmentDate,
+			"start_time":     createdAppt.StartTime,
+			"end_time":       createdAppt.EndTime,
+			"price":          createdAppt.ConsultationPrice,
+		})
+
+		_ = s.outboxRepo.Enqueue(ctx, &models.NotificationOutbox{
+			ID:             uuid.New(),
+			EventType:      "appointment_created",
+			EntityType:     "appointment",
+			EntityID:       createdAppt.ID,
+			TargetClinicID: &createdAppt.ClinicID,
+			TargetRole:     "clinic",
+			Payload:        string(payloadBytes),
+			Status:         "pending",
+		})
+	}
+
 	return mapAppointmentToDTO(createdAppt, true), nil
 }
 
@@ -366,6 +420,50 @@ func (s *appointmentService) CancelPatientAppointment(
 	if err != nil {
 		return nil, err
 	}
+
+	if s.outboxRepo != nil {
+		clinicName := ""
+		if updated.Clinic != nil {
+			clinicName = updated.Clinic.Name
+		}
+		patientName := "Bemor"
+		if updated.Patient != nil {
+			patientName = fmt.Sprintf("%s %s", updated.Patient.FirstName, updated.Patient.LastName)
+		}
+		docName := "Shifokor"
+		if updated.Doctor != nil {
+			docName = fmt.Sprintf("%s %s", updated.Doctor.FirstName, updated.Doctor.LastName)
+		}
+		reasonStr := "Bemor tomonidan bekor qilindi"
+		if req != nil && strings.TrimSpace(req.Reason) != "" {
+			reasonStr = strings.TrimSpace(req.Reason)
+		}
+
+		payloadBytes, _ := json.Marshal(map[string]any{
+			"appointment_id": updated.ID.String(),
+			"clinic_id":      updated.ClinicID.String(),
+			"clinic_name":    clinicName,
+			"patient_name":   patientName,
+			"doctor_name":    docName,
+			"date":           updated.AppointmentDate,
+			"start_time":     updated.StartTime,
+			"end_time":       updated.EndTime,
+			"cancelled_by":   "Bemor",
+			"reason":         reasonStr,
+		})
+
+		_ = s.outboxRepo.Enqueue(ctx, &models.NotificationOutbox{
+			ID:             uuid.New(),
+			EventType:      "appointment_cancelled",
+			EntityType:     "appointment",
+			EntityID:       updated.ID,
+			TargetClinicID: &updated.ClinicID,
+			TargetRole:     "clinic",
+			Payload:        string(payloadBytes),
+			Status:         "pending",
+		})
+	}
+
 	return mapAppointmentToDTO(updated, false), nil
 }
 
@@ -478,6 +576,50 @@ func (s *appointmentService) CancelClinicAppointment(
 	if err != nil {
 		return nil, err
 	}
+
+	if s.outboxRepo != nil {
+		clinicName := ""
+		if updated.Clinic != nil {
+			clinicName = updated.Clinic.Name
+		}
+		patientName := "Bemor"
+		if updated.Patient != nil {
+			patientName = fmt.Sprintf("%s %s", updated.Patient.FirstName, updated.Patient.LastName)
+		}
+		docName := "Shifokor"
+		if updated.Doctor != nil {
+			docName = fmt.Sprintf("%s %s", updated.Doctor.FirstName, updated.Doctor.LastName)
+		}
+		reasonStr := "Klinika tomonidan bekor qilindi"
+		if req != nil && strings.TrimSpace(req.Reason) != "" {
+			reasonStr = strings.TrimSpace(req.Reason)
+		}
+
+		payloadBytes, _ := json.Marshal(map[string]any{
+			"appointment_id": updated.ID.String(),
+			"clinic_id":      updated.ClinicID.String(),
+			"clinic_name":    clinicName,
+			"patient_name":   patientName,
+			"doctor_name":    docName,
+			"date":           updated.AppointmentDate,
+			"start_time":     updated.StartTime,
+			"end_time":       updated.EndTime,
+			"cancelled_by":   "Klinika ma’muriyati",
+			"reason":         reasonStr,
+		})
+
+		_ = s.outboxRepo.Enqueue(ctx, &models.NotificationOutbox{
+			ID:             uuid.New(),
+			EventType:      "appointment_cancelled",
+			EntityType:     "appointment",
+			EntityID:       updated.ID,
+			TargetClinicID: &updated.ClinicID,
+			TargetRole:     "clinic",
+			Payload:        string(payloadBytes),
+			Status:         "pending",
+		})
+	}
+
 	return mapAppointmentToDTO(updated, true), nil
 }
 

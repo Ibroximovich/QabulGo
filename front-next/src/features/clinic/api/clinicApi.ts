@@ -111,5 +111,45 @@ export const clinicApi = {
     });
     return res.data;
   },
+
+  // Telegram Bot Integration
+  getTelegramStatus(clinicId: string) {
+    return apiClient.get<ApiResponse<ClinicTelegramStatusData>>(`/clinics/${clinicId}/telegram/status`);
+  },
+
+  generateTelegramLinkToken(clinicId: string) {
+    return apiClient.post<ApiResponse<ClinicTelegramLinkTokenData>>(`/clinics/${clinicId}/telegram/link-token`);
+  },
+
+  disconnectTelegramRecipient(clinicId: string, recipientId: string) {
+    return apiClient.delete<ApiResponse<null>>(`/clinics/${clinicId}/telegram/recipients/${recipientId}`);
+  },
+
+  toggleTelegramNotifications(clinicId: string, recipientId: string) {
+    return apiClient.patch<ApiResponse<ClinicTelegramRecipient>>(`/clinics/${clinicId}/telegram/recipients/${recipientId}/toggle-notifications`);
+  },
 };
+
+export interface ClinicTelegramRecipient {
+  id: string;
+  telegram_user_id: number;
+  telegram_username: string;
+  telegram_first_name: string;
+  is_active: boolean;
+  notifications_enabled: boolean;
+  created_at: string;
+}
+
+export interface ClinicTelegramStatusData {
+  is_connected: boolean;
+  bot_username: string;
+  recipients: ClinicTelegramRecipient[];
+}
+
+export interface ClinicTelegramLinkTokenData {
+  token: string;
+  deep_link: string;
+  bot_username: string;
+  expires_at: string;
+}
 

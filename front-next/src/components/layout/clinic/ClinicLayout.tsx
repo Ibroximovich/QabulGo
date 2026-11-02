@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Clock4,
   AlertTriangle,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { clinicApi } from '@/features/clinic/api/clinicApi';
@@ -88,6 +89,12 @@ export function ClinicLayout({ children }: ClinicLayoutProps) {
       icon: Users,
       disabled: status !== 'approved',
       badge: clinic?.doctors_count !== undefined ? String(clinic.doctors_count) : undefined,
+    },
+    {
+      to: '/clinic/telegram',
+      label: 'Telegram bot',
+      icon: Send,
+      disabled: status !== 'approved',
     },
     {
       to: '/clinic/profile',

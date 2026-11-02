@@ -66,20 +66,32 @@ func main() {
 	publicSearchRepo := repositories.NewPublicSearchRepository(db)
 	scheduleRepo := repositories.NewScheduleRepository(db)
 	appointmentRepo := repositories.NewAppointmentRepository(db)
+	telegramRepo := repositories.NewTelegramRepository(db)
+	outboxRepo := repositories.NewNotificationOutboxRepository(db)
 
 	// 4. Services initsializatsiyasi
 	emailService := services.NewEmailService(cfg)
 	tokenService := services.NewTokenService(cfg, sessionRepo, userRepo)
 	authService := services.NewAuthService(cfg, userRepo, tokenRepo, tokenService, emailService)
 	patientService := services.NewPatientService(userRepo)
-	clinicService := services.NewClinicService(clinicRepo, doctorRepo, userRepo, auditRepo)
+	clinicService := services.NewClinicService(clinicRepo, doctorRepo, userRepo, auditRepo, outboxRepo)
 	doctorService := services.NewDoctorService(doctorRepo, clinicRepo, specialtyRepo, auditRepo)
 	adminService := services.NewAdminService(clinicRepo, doctorRepo, auditRepo)
 	specialtyService := services.NewSpecialtyService(specialtyRepo)
 	storageService := services.NewLocalStorageService("uploads", "/uploads")
 	publicSearchService := services.NewPublicSearchService(publicSearchRepo, doctorRepo)
 	scheduleService := services.NewScheduleService(scheduleRepo, clinicRepo, auditRepo, appointmentRepo)
-	appointmentService := services.NewAppointmentService(appointmentRepo, scheduleRepo, clinicRepo, auditRepo)
+	appointmentService := services.NewAppointmentService(appointmentRepo, scheduleRepo, clinicRepo, auditRepo, outboxRepo)
+	telegramService := services.NewTelegramService(cfg, db, telegramRepo, outboxRepo, clinicRepo, appointmentRepo, userRepo, adminService)
+	outboxWorker := services.NewNotificationWorker(outboxRepo, telegramService)
+
+	// Background worker context
+	appCtx, cancelApp := context.WithCancel(context.Background())
+	defer cancelApp()
+
+	// Start background workers
+	outboxWorker.Start(appCtx)
+	telegramService.StartPolling(appCtx)
 
 	// Mutaxassisliklar boshlang'ich seed
 	_ = specialtyService.SeedIfEmpty(context.Background())
@@ -96,6 +108,7 @@ func main() {
 	publicSearchHandler := handlers.NewPublicSearchHandler(publicSearchService)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
 	appointmentHandler := handlers.NewAppointmentHandler(appointmentService)
+	telegramHandler := handlers.NewTelegramHandler(telegramService)
 
 	// 6. Router initsializatsiyasi
 	router := routes.SetupRouter(&routes.RouterConfig{
@@ -111,6 +124,7 @@ func main() {
 		PublicSearchHandler: publicSearchHandler,
 		ScheduleHandler:     scheduleHandler,
 		AppointmentHandler:  appointmentHandler,
+		TelegramHandler:     telegramHandler,
 	})
 
 	// 7. HTTP Server sozlamalari
@@ -137,6 +151,7 @@ func main() {
 	// Signalni kutish
 	<-shutdownChan
 	log.Println("Serverni to‘xtatish so‘rovi qabul qilindi. Graceful shutdown boshlanmoqda...")
+	cancelApp()
 
 	// Kontekst bilan serverni xavfsiz to‘xtatish
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -29,10 +30,19 @@ const STATUS_TABS = [
 
 export function AdminClinicsPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const queryClinicId = searchParams.get('clinicId');
+
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const [detailClinicId, setDetailClinicId] = useState<string | null>(null);
+  const [detailClinicId, setDetailClinicId] = useState<string | null>(queryClinicId || null);
+
+  useEffect(() => {
+    if (queryClinicId) {
+      setDetailClinicId(queryClinicId);
+    }
+  }, [queryClinicId]);
 
   const [approveClinicId, setApproveClinicId] = useState<string | null>(null);
   const [rejectClinicId, setRejectClinicId] = useState<string | null>(null);

@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"qabulgo-backend/internal/dto"
 	"qabulgo-backend/internal/models"
@@ -39,6 +42,7 @@ type clinicService struct {
 	doctorRepo repositories.DoctorRepository
 	userRepo   repositories.UserRepository
 	auditRepo  repositories.AuditRepository
+	outboxRepo repositories.OutboxRepository
 }
 
 func NewClinicService(
@@ -46,13 +50,18 @@ func NewClinicService(
 	doctorRepo repositories.DoctorRepository,
 	userRepo repositories.UserRepository,
 	auditRepo repositories.AuditRepository,
+	outboxRepo ...repositories.OutboxRepository,
 ) ClinicService {
-	return &clinicService{
+	svc := &clinicService{
 		clinicRepo: clinicRepo,
 		doctorRepo: doctorRepo,
 		userRepo:   userRepo,
 		auditRepo:  auditRepo,
 	}
+	if len(outboxRepo) > 0 {
+		svc.outboxRepo = outboxRepo[0]
+	}
+	return svc
 }
 
 func (s *clinicService) CreateClinic(ctx context.Context, ownerID uuid.UUID, req *dto.CreateClinicRequest) (*dto.ClinicDetailDTO, error) {
@@ -328,6 +337,43 @@ func (s *clinicService) SubmitClinic(ctx context.Context, clinicID, userID uuid.
 
 	clinic.Status = models.ClinicStatusPending
 	clinic.RejectionReason = ""
+
+	// 6. Enqueue Outbox Notification for Superadmin Telegram Bot
+	if s.outboxRepo != nil {
+		ownerName := ""
+		ownerPhone := clinic.Phone
+		ownerEmail := clinic.Email
+		if clinic.Owner != nil {
+			ownerName = fmt.Sprintf("%s %s", clinic.Owner.FirstName, clinic.Owner.LastName)
+			if clinic.Owner.Phone != "" {
+				ownerPhone = clinic.Owner.Phone
+			}
+			if clinic.Owner.Email != "" {
+				ownerEmail = clinic.Owner.Email
+			}
+		}
+
+		payloadBytes, _ := json.Marshal(map[string]any{
+			"clinic_id":    clinic.ID.String(),
+			"clinic_name":  clinic.Name,
+			"owner_name":   ownerName,
+			"phone":        ownerPhone,
+			"email":        ownerEmail,
+			"region":       clinic.Region,
+			"district":     clinic.District,
+			"submitted_at": time.Now().Format("02.01.2006 15:04"),
+		})
+
+		_ = s.outboxRepo.Enqueue(ctx, &models.NotificationOutbox{
+			ID:         uuid.New(),
+			EventType:  "clinic_submitted",
+			EntityType: "clinic",
+			EntityID:   clinic.ID,
+			TargetRole: "admin",
+			Payload:    string(payloadBytes),
+			Status:     "pending",
+		})
+	}
 
 	return s.buildClinicDetailDTO(ctx, clinic)
 }

@@ -25,6 +25,7 @@ type RouterConfig struct {
 	PublicSearchHandler *handlers.PublicSearchHandler
 	ScheduleHandler     *handlers.ScheduleHandler
 	AppointmentHandler  *handlers.AppointmentHandler
+	TelegramHandler     *handlers.TelegramHandler
 }
 
 // SetupRouter initializes and configures the Gin engine with all routes and middlewares
@@ -123,6 +124,14 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 					protectedClinics.GET("/mine", rc.ClinicHandler.GetMyClinic)
 					protectedClinics.PATCH("/:id", rc.ClinicHandler.UpdateClinic)
 					protectedClinics.POST("/:id/submit", rc.ClinicHandler.SubmitClinic)
+
+					// Telegram Bot integration routes
+					if rc.TelegramHandler != nil {
+						protectedClinics.POST("/:id/telegram/link-token", rc.TelegramHandler.GenerateLinkToken)
+						protectedClinics.GET("/:id/telegram/status", rc.TelegramHandler.GetStatus)
+						protectedClinics.DELETE("/:id/telegram/recipients/:recipientId", rc.TelegramHandler.DisconnectRecipient)
+						protectedClinics.PATCH("/:id/telegram/recipients/:recipientId/toggle-notifications", rc.TelegramHandler.ToggleNotifications)
+					}
 				}
 			}
 		}
