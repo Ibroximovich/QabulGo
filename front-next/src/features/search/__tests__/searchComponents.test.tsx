@@ -81,7 +81,7 @@ describe('Public Search UI Components', () => {
     expect(screen.getByText('12 yil tajriba')).toBeInTheDocument();
     expect(screen.getByText(/150[\s\u00A0]*000\s*so['‘]m/i)).toBeInTheDocument();
     expect(screen.getByText('Shifo Nur Med Clinic')).toBeInTheDocument();
-    expect(screen.getByText('Tez kunda')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Qabulga yozilish/i })).toBeInTheDocument();
   });
 
   it('renders EmptySearchState with custom message and triggers onReset', () => {

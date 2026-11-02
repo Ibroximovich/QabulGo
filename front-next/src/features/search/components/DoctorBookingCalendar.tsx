@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -32,6 +32,8 @@ interface DoctorBookingCalendarProps {
   doctorName?: string;
   specialtyName?: string;
   workplaces: DoctorClinicWorkplace[];
+  selectedClinicId?: string;
+  onSelectClinic?: (clinicId: string) => void;
 }
 
 const UZ_WEEKDAYS_SHORT = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'];
@@ -94,9 +96,13 @@ export function DoctorBookingCalendar({
   doctorName,
   specialtyName,
   workplaces,
+  selectedClinicId: propSelectedClinicId,
+  onSelectClinic,
 }: DoctorBookingCalendarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const queryClinicId = searchParams?.get('clinicId') || '';
   const { user, isAuthenticated } = useSafeAuth();
   const createAppointmentMutation = useCreateAppointment();
 
@@ -107,10 +113,36 @@ export function DoctorBookingCalendar({
   const [idempotencyKey, setIdempotencyKey] = useState<string>('');
   const [bookingError, setBookingError] = useState<string | null>(null);
 
-  // 1. Selected Workplace (default to first)
-  const [selectedClinicId, setSelectedClinicId] = useState<string>(
-    workplaces?.[0]?.clinic_id || ''
-  );
+  // 1. Selected Workplace (default to prop or searchParam or first workplace)
+  const initialClinicId = useMemo(() => {
+    if (propSelectedClinicId && workplaces.some((w) => w.clinic_id === propSelectedClinicId)) {
+      return propSelectedClinicId;
+    }
+    if (queryClinicId && workplaces.some((w) => w.clinic_id === queryClinicId)) {
+      return queryClinicId;
+    }
+    return workplaces?.[0]?.clinic_id || '';
+  }, [propSelectedClinicId, queryClinicId, workplaces]);
+
+  const [selectedClinicId, setSelectedClinicId] = useState<string>(initialClinicId);
+
+  useEffect(() => {
+    if (propSelectedClinicId && workplaces.some((w) => w.clinic_id === propSelectedClinicId)) {
+      setSelectedClinicId(propSelectedClinicId);
+    }
+  }, [propSelectedClinicId, workplaces]);
+
+  useEffect(() => {
+    if (queryClinicId && workplaces.some((w) => w.clinic_id === queryClinicId)) {
+      setSelectedClinicId(queryClinicId);
+    }
+  }, [queryClinicId, workplaces]);
+
+  const handleClinicChange = (clinicId: string) => {
+    setSelectedClinicId(clinicId);
+    setSelectedSlot(null);
+    onSelectClinic?.(clinicId);
+  };
 
   // 2. Selected Date
   const todayStr = useMemo(() => getTashkentTodayString(), []);
@@ -269,11 +301,16 @@ export function DoctorBookingCalendar({
       toast.success('Qabulga muvaffaqiyatli yozildingiz! Bron avtomatik tasdiqlandi.');
     } catch (err: any) {
       const status = err?.response?.status;
-      const errorMessage =
+      let errorMessage =
         err?.response?.data?.error ||
         err?.response?.data?.message ||
         err?.message ||
         'Bron qilishda xatolik yuz berdi';
+
+      if (err?.code === 'ERR_NETWORK' || errorMessage === 'Network Error') {
+        errorMessage =
+          "Server bilan aloqa o'rnatilmadi (Network Error). Iltimos, backend server ishlab turganini tekshiring.";
+      }
 
       if (status === 409) {
         const conflictMsg = 'Bu qabul vaqti allaqachon band qilingan. Iltimos, boshqa vaqtni tanlang.';
@@ -294,7 +331,10 @@ export function DoctorBookingCalendar({
   }
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-subtle space-y-6">
+    <div
+      id="booking-calendar"
+      className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-subtle space-y-6 scroll-mt-24"
+    >
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
         <div>
@@ -315,10 +355,7 @@ export function DoctorBookingCalendar({
               <button
                 key={wp.clinic_id}
                 type="button"
-                onClick={() => {
-                  setSelectedClinicId(wp.clinic_id);
-                  setSelectedSlot(null);
-                }}
+                onClick={() => handleClinicChange(wp.clinic_id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 border ${
                   selectedClinicId === wp.clinic_id
                     ? 'bg-brand-blue text-white border-brand-blue shadow-2xs'

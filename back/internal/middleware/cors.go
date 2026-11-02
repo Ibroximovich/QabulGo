@@ -40,18 +40,21 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 	if cfg == nil || cfg.AppEnv != "production" {
 		addOrigin("http://localhost:3000")
 		addOrigin("http://localhost:5173")
+		addOrigin("http://127.0.0.1:3000")
+		addOrigin("http://127.0.0.1:5173")
 	}
 
 	// Safe fallback if no valid origin was provided
 	if len(allowedOrigins) == 0 {
 		addOrigin("http://localhost:5173")
+		addOrigin("http://localhost:3000")
 	}
 
 	corsConfig := cors.Config{
 		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
-		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "Idempotency-Key", "idempotency-key"},
+		ExposeHeaders:    []string{"Content-Length", "X-Request-ID", "Idempotency-Key"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}

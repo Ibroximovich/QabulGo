@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ClinicFilterBar, ClinicFiltersState } from '../components/ClinicFilterBar';
 import { ClinicCard } from '../components/ClinicCard';
@@ -42,9 +43,24 @@ export function ClinicSearchPage() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState<number>(10);
 
-  // Catalogs
-  const [regions, setRegions] = useState<RegionItem[]>([]);
-  const [specialties, setSpecialties] = useState<SpecialtyItem[]>([]);
+  // Cached Catalogs via React Query (30 min staleTime)
+  const { data: regions = [] } = useQuery({
+    queryKey: ['catalogRegions'],
+    queryFn: async () => {
+      const res = await searchApi.getRegionsCatalog();
+      return res.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const { data: specialties = [] } = useQuery({
+    queryKey: ['catalogSpecialties'],
+    queryFn: async () => {
+      const res = await searchApi.getSpecialties();
+      return res.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
 
   // Results & UI State
   const [clinics, setClinics] = useState<(PublicClinicItem | NearbyClinicItem)[]>([]);
@@ -56,29 +72,6 @@ export function ClinicSearchPage() {
   const selectedClinic = selectedClinicId
     ? clinics.find((c) => c.id === selectedClinicId) || null
     : null;
-
-  // Load catalogs on mount
-  useEffect(() => {
-    let active = true;
-    async function loadCatalogs() {
-      try {
-        const [regRes, specRes] = await Promise.all([
-          searchApi.getRegionsCatalog(),
-          searchApi.getSpecialties(),
-        ]);
-        if (active) {
-          if (regRes.data) setRegions(regRes.data);
-          if (specRes.data) setSpecialties(specRes.data);
-        }
-      } catch (err) {
-        console.error('Katalogni yuklashda xatolik:', err);
-      }
-    }
-    loadCatalogs();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   // Sync URL query params with state
   const updateUrlParams = useCallback(

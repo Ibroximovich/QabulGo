@@ -65,10 +65,12 @@ apiClient.interceptors.response.use(
 
     // Ignore 401s from login/register/refresh endpoints to avoid infinite loops
     const isAuthEndpoint =
-      url.includes('/auth/login') ||
-      url.includes('/auth/refresh') ||
-      url.includes('/auth/register') ||
-      url.includes('/auth/verify-email');
+      url.includes('/login') ||
+      url.includes('/refresh') ||
+      url.includes('/register') ||
+      url.includes('/verify') ||
+      url.includes('/forgot-password') ||
+      url.includes('/reset-password');
 
     if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {

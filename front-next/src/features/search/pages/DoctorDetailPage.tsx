@@ -36,6 +36,15 @@ export function DoctorDetailPage({ initialDoctor }: DoctorDetailPageProps) {
   const [doctor, setDoctor] = useState<PublicDoctorDetail | null>(initialDoctor || null);
   const [isLoading, setIsLoading] = useState<boolean>(!initialDoctor);
   const [error, setError] = useState<string | null>(null);
+  const [selectedClinicId, setSelectedClinicId] = useState<string | undefined>(undefined);
+
+  const handleSelectWorkplace = (clinicId: string) => {
+    setSelectedClinicId(clinicId);
+    const element = document.getElementById('booking-calendar');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   useEffect(() => {
     if (initialDoctor) return;
@@ -177,6 +186,8 @@ export function DoctorDetailPage({ initialDoctor }: DoctorDetailPageProps) {
           doctorName={`${doctor.first_name} ${doctor.last_name}`}
           specialtyName={doctor.primary_specialty?.name}
           workplaces={doctor.workplaces}
+          selectedClinicId={selectedClinicId}
+          onSelectClinic={setSelectedClinicId}
         />
 
         {/* Workplaces Section */}
@@ -247,14 +258,11 @@ export function DoctorDetailPage({ initialDoctor }: DoctorDetailPageProps) {
 
                   <button
                     type="button"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-blue text-white font-semibold text-xs shadow-xs hover:bg-brand-blue-600 cursor-not-allowed"
-                    title="Qabulga yozilish tez kunda ishga tushadi"
+                    onClick={() => handleSelectWorkplace(wp.clinic_id)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-blue text-white font-semibold text-xs shadow-xs hover:bg-brand-blue-600 transition-colors"
                   >
                     <Calendar className="w-4 h-4" />
                     <span>Qabulga yozilish</span>
-                    <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-white/20 text-white ml-1">
-                      Tez kunda
-                    </span>
                   </button>
                 </div>
               </div>

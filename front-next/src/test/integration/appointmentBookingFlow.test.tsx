@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
   }),
   usePathname: () => '/doctors/doc-1',
   useParams: () => ({ id: 'doc-1', appointmentId: 'appt-1' }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 // Mock Sonner Toast

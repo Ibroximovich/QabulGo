@@ -299,7 +299,7 @@ export function ClinicDetailPage({ initialClinic, initialDoctors }: ClinicDetail
             )}
 
             {/* Doctors in this Clinic */}
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-subtle space-y-6">
+            <div id="doctors" className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-subtle space-y-6 scroll-mt-24">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Users className="w-5 h-5 text-brand-blue" />
@@ -355,17 +355,13 @@ export function ClinicDetailPage({ initialClinic, initialDoctors }: ClinicDetail
                           <span className="text-sm font-extrabold text-brand-navy">
                             {formatCurrency(doc.consultation_price)}
                           </span>
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-blue/10 text-brand-blue text-xs font-bold cursor-not-allowed"
-                            title="Qabulga yozilish tez kunda ishga tushadi"
+                          <Link
+                            href={`/doctors/${doc.doctor_id}?clinicId=${clinic.id}`}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-blue text-white hover:bg-brand-blue-600 text-xs font-bold shadow-xs transition-colors"
                           >
                             <Calendar className="w-3.5 h-3.5" />
                             <span>Qabulga yozilish</span>
-                            <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded bg-brand-blue text-white ml-1">
-                              Tez kunda
-                            </span>
-                          </button>
+                          </Link>
                         </div>
                       </div>
                     );

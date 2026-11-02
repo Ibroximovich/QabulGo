@@ -41,18 +41,16 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   const navItems: NavItem[] = [
-    {
-      name: 'Kabinet',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      isAvailable: !!user,
-    },
-    {
-      name: 'Profilim',
-      href: '/profile',
-      icon: User,
-      isAvailable: !!user,
-    },
+    ...(user
+      ? [
+          {
+            name: 'Kabinet',
+            href: '/dashboard',
+            icon: LayoutDashboard,
+            isAvailable: true,
+          },
+        ]
+      : []),
     {
       name: 'Klinikalar',
       href: '/clinics',

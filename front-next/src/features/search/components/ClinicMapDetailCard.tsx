@@ -252,18 +252,13 @@ export function ClinicMapDetailCard({ clinic, onClose }: ClinicMapDetailCardProp
           <ChevronRight className="w-4 h-4" />
         </Link>
 
-        <button
-          type="button"
-          disabled
-          className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl bg-slate-200/70 text-slate-500 text-xs font-semibold cursor-not-allowed"
-          title="Qabulga yozilish tez kunda ishga tushadi"
+        <Link
+          href={`/clinics/${clinic.id}#doctors`}
+          className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/20 text-xs font-bold transition-colors"
         >
           <Calendar className="w-3.5 h-3.5" />
-          <span>Qabulga yozilish</span>
-          <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-400 text-white ml-1">
-            Tez kunda
-          </span>
-        </button>
+          <span>Shifokor tanlash va navbat olish</span>
+        </Link>
       </div>
     </div>
   );

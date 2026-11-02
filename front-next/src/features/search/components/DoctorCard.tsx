@@ -111,18 +111,14 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
         </div>
 
         <div className="flex flex-col gap-2 w-full sm:w-auto">
-          {/* Booking Button (Tez kunda) */}
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-brand-blue/10 text-brand-blue text-xs font-bold cursor-not-allowed border border-brand-blue/20"
-            title="Qabulga yozilish tez kunda ishga tushadi"
+          {/* Booking Button -> Direct link to doctor booking */}
+          <Link
+            href={`/doctors/${doctor.doctor_id}${doctor.clinic?.id ? `?clinicId=${doctor.clinic.id}` : ''}`}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-brand-blue text-white hover:bg-brand-blue-600 text-xs font-bold shadow-xs transition-colors"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Qabulga yozilish</span>
-            <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-brand-blue text-white ml-1">
-              Tez kunda
-            </span>
-          </button>
+          </Link>
 
           {/* View Profile */}
           <Link
