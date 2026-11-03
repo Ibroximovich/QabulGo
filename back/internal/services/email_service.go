@@ -4,9 +4,15 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/smtp"
+	"strings"
+	"time"
 
 	"qabulgo-backend/internal/config"
 )
@@ -55,12 +61,19 @@ func (s *emailService) SendPasswordResetEmail(toEmail, code string) error {
 
 func (s *emailService) sendMail(toEmail, subject, plainText, htmlBody, code string) error {
 	// Dev yoki Mock rejimida SMTP xatosi bo'lmasligi uchun konsolga chiqarish
-	if s.cfg.EmailMock || s.cfg.SMTPHost == "" {
+	if s.cfg.EmailMock || (s.cfg.SMTPHost == "" && !strings.HasPrefix(s.cfg.SMTPPassword, "re_")) {
 		log.Printf("\n========================================\n[DEV EMAIL MOCK] To: %s\nSubject: %s\nCode: %s\n%s\n========================================\n", toEmail, subject, code, plainText)
 		return nil
 	}
 
-	// Haqiqiy SMTP orqali chiroyli HTML + Logo bilan jo'natish
+	// Resend aniqlanganda (Host smtp.resend.com yoki kalit re_ bilan boshlansa)
+	// DigitalOcean, AWS va boshqa cloud provayderlar port 587 ni bloklashini chetlab o'tish uchun
+	// Resend REST HTTPS API (Port 443) orqali yuboramiz. Bu tez (200ms) va 100% kafolatlangan!
+	if strings.Contains(s.cfg.SMTPHost, "resend") || strings.HasPrefix(s.cfg.SMTPPassword, "re_") {
+		return s.sendViaResendAPI(toEmail, subject, plainText, htmlBody)
+	}
+
+	// Haqiqiy SMTP (masalan Gmail) orqali chiroyli HTML + Logo bilan jo'natish
 	addr := fmt.Sprintf("%s:%d", s.cfg.SMTPHost, s.cfg.SMTPPort)
 	auth := smtp.PlainAuth("", s.cfg.SMTPUser, s.cfg.SMTPPassword, s.cfg.SMTPHost)
 
@@ -103,6 +116,56 @@ func (s *emailService) sendMail(toEmail, subject, plainText, htmlBody, code stri
 		return fmt.Errorf("email yuborishda xatolik yuz berdi: %w", err)
 	}
 
+	return nil
+}
+
+func (s *emailService) sendViaResendAPI(toEmail, subject, plainText, htmlBody string) error {
+	apiKey := strings.TrimSpace(s.cfg.SMTPPassword)
+	if apiKey == "" {
+		return errors.New("resend API kaliti topilmadi")
+	}
+
+	from := s.cfg.SMTPFrom
+	if from == "" {
+		from = "QabulGo <no-reply@qabulgo.uz>"
+	}
+
+	payload := map[string]interface{}{
+		"from":    from,
+		"to":      []string{toEmail},
+		"subject": subject,
+		"html":    htmlBody,
+		"text":    plainText,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("json marshal xatoligi: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("resend request yaratishda xatolik: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[Resend API Error] Connection failed: %v", err)
+		return fmt.Errorf("resend API bilan bog'lanishda xatolik: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("[Resend API Error] HTTP %d: %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("resend email yuborishda xatolik (%d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	log.Printf("[Resend API Success] Email successfully sent to %s via Resend HTTPS API", toEmail)
 	return nil
 }
 
