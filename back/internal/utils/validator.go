@@ -65,3 +65,17 @@ func ValidatePassword(password string) error {
 func SanitizeString(s string) string {
 	return strings.TrimSpace(s)
 }
+
+// MaskEmail masks email address for secure logging (e.g. al***@gmail.com)
+func MaskEmail(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return "***"
+	}
+	name := parts[0]
+	domain := parts[1]
+	if len(name) <= 2 {
+		return "***@" + domain
+	}
+	return name[:2] + "***@" + domain
+}

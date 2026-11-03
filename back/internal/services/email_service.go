@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"qabulgo-backend/internal/config"
+	"qabulgo-backend/internal/utils"
 )
 
 //go:embed assets/logo.jpg
@@ -60,16 +61,7 @@ func (s *emailService) SendPasswordResetEmail(toEmail, code string) error {
 }
 
 func maskEmail(email string) string {
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return "***"
-	}
-	name := parts[0]
-	domain := parts[1]
-	if len(name) <= 2 {
-		return "***@" + domain
-	}
-	return name[:2] + "***@" + domain
+	return utils.MaskEmail(email)
 }
 
 func (s *emailService) sendMail(toEmail, subject, plainText, htmlBody, code string) error {
@@ -141,86 +133,54 @@ func (s *emailService) sendViaResendAPI(toEmail, subject, plainText, htmlBody st
 		return errors.New("resend API kaliti topilmadi")
 	}
 
-	primaryFrom := s.cfg.SMTPFrom
-	if primaryFrom == "" {
-		primaryFrom = "QabulGo <no-reply@qabulgo.uz>"
+	from := s.cfg.SMTPFrom
+	if from == "" {
+		from = "QabulGo <no-reply@qabulgo.uz>"
 	}
 
-	sendWithSender := func(sender string) (int, string, string, error) {
-		payload := map[string]interface{}{
-			"from":    sender,
-			"to":      []string{toEmail},
-			"subject": subject,
-			"html":    htmlBody,
-			"text":    plainText,
-		}
-
-		payloadBytes, err := json.Marshal(payload)
-		if err != nil {
-			return 0, "", "", fmt.Errorf("json marshal xatoligi: %w", err)
-		}
-
-		req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(payloadBytes))
-		if err != nil {
-			return 0, "", "", fmt.Errorf("resend request yaratishda xatolik: %w", err)
-		}
-
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-		req.Header.Set("Content-Type", "application/json")
-
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return 0, "", "", err
-		}
-		defer resp.Body.Close()
-
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		var resendResp struct {
-			ID string `json:"id"`
-		}
-		_ = json.Unmarshal(bodyBytes, &resendResp)
-
-		return resp.StatusCode, resendResp.ID, string(bodyBytes), nil
+	payload := map[string]interface{}{
+		"from":    from,
+		"to":      []string{toEmail},
+		"subject": subject,
+		"html":    htmlBody,
+		"text":    plainText,
 	}
 
-	// 1-urinish: Asosiy sender (masalan QabulGo <no-reply@qabulgo.uz>)
-	statusCode, reqID, bodyStr, err := sendWithSender(primaryFrom)
-	if err == nil && statusCode < 400 {
-		log.Printf("[Resend API Success] RequestID: %s | Recipient: %s | Sender: %s", reqID, maskEmail(toEmail), primaryFrom)
-		return nil
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("json marshal xatoligi: %w", err)
 	}
 
-	log.Printf("[Resend API Attempt 1 Failed] Status: %d | Recipient: %s", statusCode, maskEmail(toEmail))
-
-	// Agar 403 (domain not verified) bo'lsa, avtomatik Resend hisobidagi tasdiqlangan domenga fallback:
-	if statusCode == 403 && (strings.Contains(bodyStr, "not verified") || strings.Contains(bodyStr, "testing emails")) {
-		// Fallback 1: darshub.uz (tasdiqlangan domen)
-		fallbackSender := "QabulGo <no-reply@darshub.uz>"
-		if primaryFrom != fallbackSender {
-			log.Printf("[Resend Fallback 1] Tasdiqlangan domen (%s) orqali yuborilmoqda...", fallbackSender)
-			statusCode, reqID, bodyStr, err = sendWithSender(fallbackSender)
-			if err == nil && statusCode < 400 {
-				log.Printf("[Resend API Success] RequestID: %s | Recipient: %s | Sender: %s (Fallback 1)", reqID, maskEmail(toEmail), fallbackSender)
-				return nil
-			}
-			log.Printf("[Resend Fallback 1 Failed] Status: %d | Recipient: %s", statusCode, maskEmail(toEmail))
-		}
-
-		// Fallback 2: onboarding@resend.dev (faqat hisob egasiga jo'natish uchun)
-		testSender := "QabulGo <onboarding@resend.dev>"
-		if primaryFrom != testSender && fallbackSender != testSender {
-			log.Printf("[Resend Fallback 2] Sinov jo'natuvchisi (%s) orqali yuborilmoqda...", testSender)
-			statusCode, reqID, bodyStr, err = sendWithSender(testSender)
-			if err == nil && statusCode < 400 {
-				log.Printf("[Resend API Success] RequestID: %s | Recipient: %s | Sender: %s (Fallback 2)", reqID, maskEmail(toEmail), testSender)
-				return nil
-			}
-			log.Printf("[Resend Fallback 2 Failed] Status: %d | Recipient: %s", statusCode, maskEmail(toEmail))
-		}
+	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("resend request yaratishda xatolik: %w", err)
 	}
 
-	return fmt.Errorf("resend email yuborishda xatolik (%d)", statusCode)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[Resend API Error] Connection failed for %s: %v", maskEmail(toEmail), err)
+		return fmt.Errorf("resend API bilan bog'lanishda xatolik: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 400 {
+		log.Printf("[Resend API Error] HTTP %d | Recipient: %s", resp.StatusCode, maskEmail(toEmail))
+		return fmt.Errorf("email yuborishda xatolik yuz berdi (HTTP %d)", resp.StatusCode)
+	}
+
+	var resendResp struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(bodyBytes, &resendResp)
+
+	log.Printf("[Resend API Success] RequestID: %s | Recipient: %s | Sender: %s", resendResp.ID, maskEmail(toEmail), from)
+	return nil
 }
 
 func formatBase64Lines(data []byte) string {

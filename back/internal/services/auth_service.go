@@ -180,7 +180,7 @@ func (s *authService) registerUser(
 
 	// 11. Email orqali yuborish
 	if err := s.emailService.SendVerificationEmail(user.Email, code); err != nil {
-		log.Printf("[Register Warning] Failed to send verification email to %s: %v", user.Email, err)
+		log.Printf("[Register Warning] Failed to send verification email to %s: %v", utils.MaskEmail(user.Email), err)
 		return nil, fmt.Errorf("hisob yaratildi, ammo tasdiqlash kodini emailga yuborishda xatolik yuz berdi: %w", err)
 	}
 
@@ -290,7 +290,12 @@ func (s *authService) ResendVerification(ctx context.Context, req *dto.ResendVer
 		return err
 	}
 
-	return s.emailService.SendVerificationEmail(user.Email, code)
+	if err := s.emailService.SendVerificationEmail(user.Email, code); err != nil {
+		log.Printf("[Resend Verification Error] Failed to send email to %s: %v", utils.MaskEmail(user.Email), err)
+		return fmt.Errorf("tasdiqlash kodini emailga yuborishda xatolik yuz berdi: %w", err)
+	}
+
+	return nil
 }
 
 func (s *authService) LoginPatient(ctx context.Context, req *dto.PatientLoginRequest) (*dto.LoginData, string, time.Time, error) {
@@ -396,7 +401,12 @@ func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 		return err
 	}
 
-	return s.emailService.SendPasswordResetEmail(user.Email, code)
+	if err := s.emailService.SendPasswordResetEmail(user.Email, code); err != nil {
+		log.Printf("[Forgot Password Error] Failed to send password reset email to %s: %v", utils.MaskEmail(user.Email), err)
+		return err
+	}
+
+	return nil
 }
 
 func (s *authService) ResetPassword(ctx context.Context, req *dto.ResetPasswordRequest) error {
