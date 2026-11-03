@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -179,7 +180,8 @@ func (s *authService) registerUser(
 
 	// 11. Email orqali yuborish
 	if err := s.emailService.SendVerificationEmail(user.Email, code); err != nil {
-		// Log error, lekin tranzaksiyani bekor qilmaymiz (resend mavjud)
+		log.Printf("[Register Warning] Failed to send verification email to %s: %v", user.Email, err)
+		return nil, fmt.Errorf("hisob yaratildi, ammo tasdiqlash kodini emailga yuborishda xatolik yuz berdi: %w", err)
 	}
 
 	return &dto.PatientRegisterData{

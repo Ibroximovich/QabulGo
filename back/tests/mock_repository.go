@@ -1484,18 +1484,19 @@ func (m *MockAppointmentRepository) GetByID(ctx context.Context, id uuid.UUID) (
 	copyAppt := *appt
 
 	if m.userRepo != nil {
-		if u, exists := m.userRepo.users[copyAppt.PatientID]; exists {
+		if u, err := m.userRepo.GetByID(ctx, copyAppt.PatientID); err == nil && u != nil {
 			uCopy := *u
 			copyAppt.Patient = &uCopy
 		}
 	}
 	if m.clinicRepo != nil {
-		if c, exists := m.clinicRepo.clinics[copyAppt.ClinicID]; exists {
+		if c, err := m.clinicRepo.GetByID(ctx, copyAppt.ClinicID); err == nil && c != nil {
 			cCopy := *c
 			copyAppt.Clinic = &cCopy
 		}
 	}
 	if m.doctorRepo != nil {
+		m.doctorRepo.mu.RLock()
 		if d, exists := m.doctorRepo.doctors[copyAppt.DoctorID]; exists {
 			dCopy := *d
 			copyAppt.Doctor = &dCopy
@@ -1504,6 +1505,7 @@ func (m *MockAppointmentRepository) GetByID(ctx context.Context, id uuid.UUID) (
 			cdCopy := *cd
 			copyAppt.ClinicDoctor = &cdCopy
 		}
+		m.doctorRepo.mu.RUnlock()
 	}
 
 	return &copyAppt, nil

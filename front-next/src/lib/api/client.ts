@@ -2,10 +2,11 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { tokenStorage } from './tokenStorage';
 import { ApiResponse, RefreshTokenResponse } from '@/types/api';
 
-const rawBaseUrl =
+const rawBaseUrl = (
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   (typeof window !== 'undefined' ? (window as unknown as { __ENV_API_BASE_URL?: string }).__ENV_API_BASE_URL : '') ||
-  'http://localhost:8080/api/v1';
+  'http://localhost:8080/api/v1'
+).trim();
 
 const cleanBaseUrl = rawBaseUrl.replace(/\/+$/, '');
 const baseURL = cleanBaseUrl.endsWith('/api/v1') ? cleanBaseUrl : `${cleanBaseUrl}/api/v1`;
