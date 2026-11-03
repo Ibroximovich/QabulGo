@@ -40,8 +40,10 @@ func NewTokenService(cfg *config.Config, sessionRepo repositories.RefreshSession
 	}
 }
 
+const PatientAndClinicSessionTTL = 30 * 24 * time.Hour
+
 func (s *tokenService) GenerateTokenPair(ctx context.Context, userID uuid.UUID, role string) (string, string, time.Time, error) {
-	// Access Token yaratish
+	// Access Token yaratish (15 daqiqa)
 	accessToken, err := utils.GenerateAccessToken(userID, role, s.cfg.AccessTokenTTL, s.cfg.JWTSecret, s.cfg.JWTIssuer, s.cfg.JWTAudience)
 	if err != nil {
 		return "", "", time.Time{}, err
@@ -54,14 +56,26 @@ func (s *tokenService) GenerateTokenPair(ctx context.Context, userID uuid.UUID, 
 	}
 
 	tokenHash := utils.HashToken(rawRefreshToken)
-	expiresAt := time.Now().UTC().Add(s.cfg.RefreshTokenTTL)
+	now := time.Now().UTC()
+
+	var sessionTTL time.Duration
+	if role == string(models.RolePatient) || role == string(models.RoleClinicOwner) || role == string(models.RoleClinicAdmin) {
+		sessionTTL = PatientAndClinicSessionTTL // Bemor va klinika uchun 30 kunlik sessiya
+	} else {
+		// SuperAdmin uchun standart konfiguratsiyadagi TTL (7 kun) o'zgarmasdan saqlanadi
+		sessionTTL = s.cfg.RefreshTokenTTL
+	}
+
+	maxExpiresAt := now.Add(sessionTTL)
+	expiresAt := maxExpiresAt
 
 	session := &models.RefreshSession{
-		UserID:     userID,
-		TokenHash:  tokenHash,
-		ExpiresAt:  expiresAt,
-		CreatedAt:  time.Now().UTC(),
-		LastUsedAt: time.Now().UTC(),
+		UserID:       userID,
+		TokenHash:    tokenHash,
+		ExpiresAt:    expiresAt,
+		MaxExpiresAt: maxExpiresAt,
+		CreatedAt:    now,
+		LastUsedAt:   now,
 	}
 
 	if err := s.sessionRepo.Create(ctx, session); err != nil {
@@ -85,8 +99,15 @@ func (s *tokenService) RotateRefreshToken(ctx context.Context, rawRefreshToken s
 		return "", "", time.Time{}, ErrTokenReused
 	}
 
-	// Muddati tekshiriladi
-	if time.Now().UTC().After(session.ExpiresAt) {
+	now := time.Now().UTC()
+	maxExpiresAt := session.MaxExpiresAt
+	if maxExpiresAt.IsZero() {
+		maxExpiresAt = session.ExpiresAt
+	}
+
+	// 1. Dastlabki login vaqtidan hisoblangan mutlaq (absolute) maksimal 30 kunlik muddat tekshiriladi
+	// 2. Oddiy expires_at muddati tekshiriladi
+	if now.After(session.ExpiresAt) || now.After(maxExpiresAt) {
 		return "", "", time.Time{}, ErrSessionExpired
 	}
 
@@ -104,8 +125,50 @@ func (s *tokenService) RotateRefreshToken(ctx context.Context, rawRefreshToken s
 		return "", "", time.Time{}, err
 	}
 
-	// Yangi juftlik yaratish
-	return s.GenerateTokenPair(ctx, user.ID, string(user.Role))
+	// Yangi Access Token yaratish
+	accessToken, err := utils.GenerateAccessToken(user.ID, string(user.Role), s.cfg.AccessTokenTTL, s.cfg.JWTSecret, s.cfg.JWTIssuer, s.cfg.JWTAudience)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+
+	// Yangi Refresh Token yaratish
+	newRawRefreshToken, err := utils.GenerateRandomToken(32)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+
+	newTokenHash := utils.HashToken(newRawRefreshToken)
+
+	// Yangi sessiyaning amal qilish muddati:
+	// Bemor va klinika akkauntlari uchun dastlabki logindan hisoblangan mutlaq 30 kunlik chegara (maxExpiresAt) saqlanadi
+	// 30 kundan ortiq uzaytirilmaydi!
+	// SuperAdmin uchun standart RefreshTokenTTL saqlanadi
+	var newExpiresAt time.Time
+	var newMaxExpiresAt time.Time
+
+	if user.Role == models.RolePatient || user.Role == models.RoleClinicOwner || user.Role == models.RoleClinicAdmin {
+		newMaxExpiresAt = maxExpiresAt // Dastlabki logindagi mutlaq 30 kunlik sana uzaytirilmaydi
+		newExpiresAt = maxExpiresAt
+	} else {
+		// Superadmin
+		newExpiresAt = now.Add(s.cfg.RefreshTokenTTL)
+		newMaxExpiresAt = newExpiresAt
+	}
+
+	newSession := &models.RefreshSession{
+		UserID:       user.ID,
+		TokenHash:    newTokenHash,
+		ExpiresAt:    newExpiresAt,
+		MaxExpiresAt: newMaxExpiresAt,
+		CreatedAt:    now,
+		LastUsedAt:   now,
+	}
+
+	if err := s.sessionRepo.Create(ctx, newSession); err != nil {
+		return "", "", time.Time{}, err
+	}
+
+	return accessToken, newRawRefreshToken, newExpiresAt, nil
 }
 
 func (s *tokenService) RevokeSession(ctx context.Context, rawRefreshToken string) error {

@@ -34,11 +34,11 @@ var (
 type AuthService interface {
 	RegisterPatient(ctx context.Context, req *dto.PatientRegisterRequest) (*dto.PatientRegisterData, error)
 	RegisterClinic(ctx context.Context, req *dto.ClinicRegisterRequest) (*dto.PatientRegisterData, error)
-	VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.LoginData, string, error)
+	VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.LoginData, string, time.Time, error)
 	ResendVerification(ctx context.Context, req *dto.ResendVerificationRequest) error
-	LoginPatient(ctx context.Context, req *dto.PatientLoginRequest) (*dto.LoginData, string, error)
-	LoginClinic(ctx context.Context, req *dto.ClinicLoginRequest) (*dto.LoginData, string, error)
-	LoginSuperAdmin(ctx context.Context, req *dto.SuperAdminLoginRequest) (*dto.LoginData, string, error)
+	LoginPatient(ctx context.Context, req *dto.PatientLoginRequest) (*dto.LoginData, string, time.Time, error)
+	LoginClinic(ctx context.Context, req *dto.ClinicLoginRequest) (*dto.LoginData, string, time.Time, error)
+	LoginSuperAdmin(ctx context.Context, req *dto.SuperAdminLoginRequest) (*dto.LoginData, string, time.Time, error)
 	ForgotPassword(ctx context.Context, req *dto.ForgotPasswordRequest) error
 	ResetPassword(ctx context.Context, req *dto.ResetPasswordRequest) error
 }
@@ -193,47 +193,47 @@ func (s *authService) registerUser(
 	}, nil
 }
 
-func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.LoginData, string, error) {
+func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.LoginData, string, time.Time, error) {
 	email := utils.NormalizeEmail(req.Email)
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
-		return nil, "", ErrInvalidOrExpiredCode
+		return nil, "", time.Time{}, ErrInvalidOrExpiredCode
 	}
 
 	if user.IsEmailVerified() {
-		return nil, "", ErrEmailAlreadyVerified
+		return nil, "", time.Time{}, ErrEmailAlreadyVerified
 	}
 
 	token, err := s.tokenRepo.GetLatestActive(ctx, user.ID, models.PurposeEmailVerification)
 	if err != nil {
-		return nil, "", ErrInvalidOrExpiredCode
+		return nil, "", time.Time{}, ErrInvalidOrExpiredCode
 	}
 
 	if token.Attempts >= 5 {
-		return nil, "", ErrTooManyAttempts
+		return nil, "", time.Time{}, ErrTooManyAttempts
 	}
 
 	inputHash := utils.HashToken(strings.TrimSpace(req.Code))
 	if inputHash != token.TokenHash {
 		_ = s.tokenRepo.IncrementAttempts(ctx, token.ID)
-		return nil, "", ErrInvalidOrExpiredCode
+		return nil, "", time.Time{}, ErrInvalidOrExpiredCode
 	}
 
 	// Kod to'g'ri! Mark consumed
 	if err := s.tokenRepo.MarkConsumed(ctx, token.ID); err != nil {
-		return nil, "", err
+		return nil, "", time.Time{}, err
 	}
 
 	// Update user verified_at
 	now := time.Now().UTC()
 	if err := s.userRepo.UpdateEmailVerified(ctx, user.ID, now); err != nil {
-		return nil, "", err
+		return nil, "", time.Time{}, err
 	}
 
 	// Automatic Session generation so user doesn't have to re-login!
-	accessToken, rawRefreshToken, _, err := s.tokenService.GenerateTokenPair(ctx, user.ID, string(user.Role))
+	accessToken, rawRefreshToken, expiresAt, err := s.tokenService.GenerateTokenPair(ctx, user.ID, string(user.Role))
 	if err != nil {
-		return nil, "", err
+		return nil, "", time.Time{}, err
 	}
 
 	loginData := &dto.LoginData{
@@ -250,7 +250,7 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 		},
 	}
 
-	return loginData, rawRefreshToken, nil
+	return loginData, rawRefreshToken, expiresAt, nil
 }
 
 func (s *authService) ResendVerification(ctx context.Context, req *dto.ResendVerificationRequest) error {
@@ -291,19 +291,19 @@ func (s *authService) ResendVerification(ctx context.Context, req *dto.ResendVer
 	return s.emailService.SendVerificationEmail(user.Email, code)
 }
 
-func (s *authService) LoginPatient(ctx context.Context, req *dto.PatientLoginRequest) (*dto.LoginData, string, error) {
+func (s *authService) LoginPatient(ctx context.Context, req *dto.PatientLoginRequest) (*dto.LoginData, string, time.Time, error) {
 	return s.loginWithRoles(ctx, req.Email, req.Password, []models.UserRole{models.RolePatient})
 }
 
-func (s *authService) LoginClinic(ctx context.Context, req *dto.ClinicLoginRequest) (*dto.LoginData, string, error) {
+func (s *authService) LoginClinic(ctx context.Context, req *dto.ClinicLoginRequest) (*dto.LoginData, string, time.Time, error) {
 	return s.loginWithRoles(ctx, req.Email, req.Password, []models.UserRole{models.RoleClinicOwner, models.RoleClinicAdmin})
 }
 
-func (s *authService) LoginSuperAdmin(ctx context.Context, req *dto.SuperAdminLoginRequest) (*dto.LoginData, string, error) {
+func (s *authService) LoginSuperAdmin(ctx context.Context, req *dto.SuperAdminLoginRequest) (*dto.LoginData, string, time.Time, error) {
 	return s.loginWithRoles(ctx, req.Email, req.Password, []models.UserRole{models.RoleSuperAdmin})
 }
 
-func (s *authService) loginWithRoles(ctx context.Context, emailRaw, password string, allowedRoles []models.UserRole) (*dto.LoginData, string, error) {
+func (s *authService) loginWithRoles(ctx context.Context, emailRaw, password string, allowedRoles []models.UserRole) (*dto.LoginData, string, time.Time, error) {
 	email := utils.NormalizeEmail(emailRaw)
 	user, err := s.userRepo.GetByEmail(ctx, email)
 
@@ -311,23 +311,23 @@ func (s *authService) loginWithRoles(ctx context.Context, emailRaw, password str
 	if err != nil {
 		dummyHash := "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQxMjM0NTY3OA$c29tZWhhc2gxMjM0NTY3OA"
 		_, _ = utils.VerifyPassword(password, dummyHash)
-		return nil, "", ErrInvalidCredentials
+		return nil, "", time.Time{}, ErrInvalidCredentials
 	}
 
 	// Parolni tekshirish
 	match, err := utils.VerifyPassword(password, user.PasswordHash)
 	if err != nil || !match {
-		return nil, "", ErrInvalidCredentials
+		return nil, "", time.Time{}, ErrInvalidCredentials
 	}
 
 	// Akkaunt holati tekshiruvi
 	if !user.IsActive() {
-		return nil, "", ErrAccountBlocked
+		return nil, "", time.Time{}, ErrAccountBlocked
 	}
 
 	// Email tasdiqlanganligini tekshirish
 	if !user.IsEmailVerified() {
-		return nil, "", ErrEmailNotVerified
+		return nil, "", time.Time{}, ErrEmailNotVerified
 	}
 
 	// Role tekshiruvi
@@ -339,13 +339,13 @@ func (s *authService) loginWithRoles(ctx context.Context, emailRaw, password str
 		}
 	}
 	if !roleAllowed {
-		return nil, "", ErrRoleNotAllowed
+		return nil, "", time.Time{}, ErrRoleNotAllowed
 	}
 
 	// Token juftligini yaratish
-	accessToken, rawRefreshToken, _, err := s.tokenService.GenerateTokenPair(ctx, user.ID, string(user.Role))
+	accessToken, rawRefreshToken, expiresAt, err := s.tokenService.GenerateTokenPair(ctx, user.ID, string(user.Role))
 	if err != nil {
-		return nil, "", err
+		return nil, "", time.Time{}, err
 	}
 
 	loginData := &dto.LoginData{
@@ -362,7 +362,7 @@ func (s *authService) loginWithRoles(ctx context.Context, emailRaw, password str
 		},
 	}
 
-	return loginData, rawRefreshToken, nil
+	return loginData, rawRefreshToken, expiresAt, nil
 }
 
 func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswordRequest) error {

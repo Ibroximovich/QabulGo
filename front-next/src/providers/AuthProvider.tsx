@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import axios from 'axios';
 import { toast } from 'sonner';
 import { UserSummary } from '@/types/api';
 import { authApi } from '@/features/auth/api/authApi';
@@ -188,12 +189,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(true);
           }
         }
-      } catch {
-        // Not authenticated or refresh token expired
-        if (isMounted) {
-          tokenStorage.clear();
-          setUser(null);
-          setIsAuthenticated(false);
+      } catch (err: unknown) {
+        const isAxiosErr = axios.isAxiosError(err);
+        const status = isAxiosErr ? err.response?.status : undefined;
+
+        // Faqat server aniq 401 Unauthorized qaytarsa (token yo'q yoki muddati tugagan), sessiya tozalanadi
+        if (status === 401) {
+          if (isMounted) {
+            tokenStorage.clear();
+            setUser(null);
+            setIsAuthenticated(false);
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('qabulgo_user');
+              } catch {
+                // Ignore
+              }
+            }
+          }
+        } else {
+          // Vaqtinchalik tarmoq xatosi (offline, timeout, 5xx server xatosi):
+          // Agar foydalanuvchi ma'lumoti avval local storage'da cached bo'lsa, uni darhol o'chirib yubormaymiz
+          if (isMounted) {
+            const cachedStr = typeof window !== 'undefined' ? localStorage.getItem('qabulgo_user') : null;
+            if (cachedStr) {
+              try {
+                const cached = JSON.parse(cachedStr);
+                setUser(cached);
+                setIsAuthenticated(true);
+              } catch {
+                tokenStorage.clear();
+                setUser(null);
+                setIsAuthenticated(false);
+              }
+            } else {
+              tokenStorage.clear();
+              setUser(null);
+              setIsAuthenticated(false);
+            }
+          }
         }
       } finally {
         if (isMounted) {

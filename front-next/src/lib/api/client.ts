@@ -106,9 +106,14 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshErr) {
         processQueue(refreshErr as Error, null);
-        tokenStorage.clear();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        const isAxiosErr = axios.isAxiosError(refreshErr);
+        // Faqat server aniq 401 Unauthorized qaytarganida sessiyani tugatamiz
+        // Vaqtinchalik tarmoq xatolarida sessiya saqlanib qoladi
+        if (isAxiosErr && refreshErr.response?.status === 401) {
+          tokenStorage.clear();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('auth:session-expired'));
+          }
         }
         return Promise.reject(refreshErr);
       } finally {

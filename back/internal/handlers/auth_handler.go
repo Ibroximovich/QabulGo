@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"qabulgo-backend/internal/config"
 	"qabulgo-backend/internal/dto"
@@ -28,17 +29,54 @@ func NewAuthHandler(cfg *config.Config, authService services.AuthService, tokenS
 	}
 }
 
-func (h *AuthHandler) setRefreshTokenCookie(c *gin.Context, rawRefreshToken string) {
-	maxAge := int(h.cfg.RefreshTokenTTL.Seconds())
-	c.SetSameSite(http.SameSiteLaxMode)
+func (h *AuthHandler) setRefreshTokenCookie(c *gin.Context, rawRefreshToken string, expiresAt time.Time) {
+	maxAge := int(time.Until(expiresAt).Seconds())
+	if maxAge < 0 {
+		maxAge = 0
+	}
+
+	cookieDomain := ""
+	if h.cfg.CookieDomain != "" && h.cfg.CookieDomain != "localhost" {
+		cookieDomain = h.cfg.CookieDomain
+	}
+
+	if h.cfg.CookieSecure {
+		c.SetSameSite(http.SameSiteNoneMode)
+	} else {
+		c.SetSameSite(http.SameSiteLaxMode)
+	}
+
 	c.SetCookie(
 		RefreshTokenCookieName,
 		rawRefreshToken,
 		maxAge,
 		"/",
-		"",
+		cookieDomain,
 		h.cfg.CookieSecure,
 		true, // HttpOnly
+	)
+}
+
+func (h *AuthHandler) clearRefreshTokenCookie(c *gin.Context) {
+	cookieDomain := ""
+	if h.cfg.CookieDomain != "" && h.cfg.CookieDomain != "localhost" {
+		cookieDomain = h.cfg.CookieDomain
+	}
+
+	if h.cfg.CookieSecure {
+		c.SetSameSite(http.SameSiteNoneMode)
+	} else {
+		c.SetSameSite(http.SameSiteLaxMode)
+	}
+
+	c.SetCookie(
+		RefreshTokenCookieName,
+		"",
+		-1,
+		"/",
+		cookieDomain,
+		h.cfg.CookieSecure,
+		true,
 	)
 }
 
@@ -111,7 +149,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	loginData, rawRefreshToken, err := h.authService.VerifyEmail(c.Request.Context(), &req)
+	loginData, rawRefreshToken, expiresAt, err := h.authService.VerifyEmail(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, services.ErrTooManyAttempts) {
 			c.JSON(http.StatusTooManyRequests, dto.NewErrorResponse(err.Error(), nil))
@@ -122,7 +160,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	}
 
 	if rawRefreshToken != "" {
-		h.setRefreshTokenCookie(c, rawRefreshToken)
+		h.setRefreshTokenCookie(c, rawRefreshToken, expiresAt)
 	}
 
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Emailingiz muvaffaqiyatli tasdiqlandi.", loginData))
@@ -197,7 +235,7 @@ func (h *AuthHandler) LoginClinic(c *gin.Context) {
 		return
 	}
 
-	data, rawRefreshToken, err := h.authService.LoginClinic(c.Request.Context(), &req)
+	data, rawRefreshToken, expiresAt, err := h.authService.LoginClinic(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			c.JSON(http.StatusUnauthorized, dto.NewErrorResponse(err.Error(), nil))
@@ -211,7 +249,7 @@ func (h *AuthHandler) LoginClinic(c *gin.Context) {
 		return
 	}
 
-	h.setRefreshTokenCookie(c, rawRefreshToken)
+	h.setRefreshTokenCookie(c, rawRefreshToken, expiresAt)
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Muvaffaqiyatli tizimga kirdingiz", data))
 }
 
@@ -233,7 +271,7 @@ func (h *AuthHandler) LoginSuperAdmin(c *gin.Context) {
 		return
 	}
 
-	data, rawRefreshToken, err := h.authService.LoginSuperAdmin(c.Request.Context(), &req)
+	data, rawRefreshToken, expiresAt, err := h.authService.LoginSuperAdmin(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			c.JSON(http.StatusUnauthorized, dto.NewErrorResponse(err.Error(), nil))
@@ -247,7 +285,7 @@ func (h *AuthHandler) LoginSuperAdmin(c *gin.Context) {
 		return
 	}
 
-	h.setRefreshTokenCookie(c, rawRefreshToken)
+	h.setRefreshTokenCookie(c, rawRefreshToken, expiresAt)
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Superadmin sifatida muvaffaqiyatli tizimga kirdingiz", data))
 }
 
@@ -294,7 +332,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	data, rawRefreshToken, err := h.authService.LoginPatient(c.Request.Context(), &req)
+	data, rawRefreshToken, expiresAt, err := h.authService.LoginPatient(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			c.JSON(http.StatusUnauthorized, dto.NewErrorResponse(err.Error(), nil))
@@ -309,17 +347,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// HttpOnly Refresh Token Cookie o'rnatish
-	maxAge := int(h.cfg.RefreshTokenTTL.Seconds())
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(
-		RefreshTokenCookieName,
-		rawRefreshToken,
-		maxAge,
-		"/",
-		"",
-		h.cfg.CookieSecure,
-		true, // HttpOnly
-	)
+	h.setRefreshTokenCookie(c, rawRefreshToken, expiresAt)
 
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Muvaffaqiyatli tizimga kirdingiz", data))
 }
@@ -354,26 +382,16 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	newAccessToken, newRefreshToken, _, err := h.tokenService.RotateRefreshToken(c.Request.Context(), rawRefreshToken)
+	newAccessToken, newRefreshToken, expiresAt, err := h.tokenService.RotateRefreshToken(c.Request.Context(), rawRefreshToken)
 	if err != nil {
 		// Token yaroqsiz bo'lsa cookie'ni tozalaymiz
-		c.SetCookie(RefreshTokenCookieName, "", -1, "/", "", h.cfg.CookieSecure, true)
+		h.clearRefreshTokenCookie(c)
 		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse(err.Error(), nil))
 		return
 	}
 
 	// Yangi refresh token cookie
-	maxAge := int(h.cfg.RefreshTokenTTL.Seconds())
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(
-		RefreshTokenCookieName,
-		newRefreshToken,
-		maxAge,
-		"/",
-		"",
-		h.cfg.CookieSecure,
-		true,
-	)
+	h.setRefreshTokenCookie(c, newRefreshToken, expiresAt)
 
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Token muvaffaqiyatli yangilandi", gin.H{
 		"access_token": newAccessToken,
@@ -396,16 +414,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	// Cookieni tozalash
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(
-		RefreshTokenCookieName,
-		"",
-		-1,
-		"/",
-		"",
-		h.cfg.CookieSecure,
-		true,
-	)
+	h.clearRefreshTokenCookie(c)
 
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Muvaffaqiyatli tizimdan chiqildi", nil))
 }
