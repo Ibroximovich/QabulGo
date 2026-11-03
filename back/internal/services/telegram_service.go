@@ -37,7 +37,9 @@ type TelegramService interface {
 	ToggleClinicNotifications(ctx context.Context, clinicID, userID, recipientID uuid.UUID) (*dto.ClinicTelegramRecipientDTO, error)
 
 	// Admin Cabinet Endpoints
-	GetAdminTelegramStatus(ctx context.Context) (*dto.AdminTelegramStatusResponse, error)
+	GenerateAdminLinkingToken(ctx context.Context, userID uuid.UUID) (*dto.TelegramLinkTokenResponse, error)
+	GetAdminTelegramStatus(ctx context.Context, userID uuid.UUID) (*dto.AdminTelegramStatusResponse, error)
+	DisconnectAdminRecipient(ctx context.Context, userID uuid.UUID) error
 
 	// Bot Update Processors
 	ProcessClinicBotUpdate(ctx context.Context, update *telegram.Update) error
@@ -212,7 +214,45 @@ func (s *telegramService) ToggleClinicNotifications(ctx context.Context, clinicI
 	}, nil
 }
 
-func (s *telegramService) GetAdminTelegramStatus(ctx context.Context) (*dto.AdminTelegramStatusResponse, error) {
+func (s *telegramService) GenerateAdminLinkingToken(ctx context.Context, userID uuid.UUID) (*dto.TelegramLinkTokenResponse, error) {
+	rawBytes := make([]byte, 24)
+	if _, err := rand.Read(rawBytes); err != nil {
+		return nil, fmt.Errorf("tasodifiy token yaratishda xatolik: %w", err)
+	}
+	rawToken := hex.EncodeToString(rawBytes)
+
+	hasher := sha256.New()
+	hasher.Write([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hasher.Sum(nil))
+
+	expiresAt := time.Now().UTC().Add(15 * time.Minute)
+	tokenRecord := &models.AdminTelegramLinkingToken{
+		ID:        uuid.New(),
+		UserID:    userID,
+		TokenHash: tokenHash,
+		IsUsed:    false,
+		ExpiresAt: expiresAt,
+	}
+
+	if err := s.telegramRepo.CreateAdminLinkingToken(ctx, tokenRecord); err != nil {
+		return nil, fmt.Errorf("tokenni saqlashda xatolik: %w", err)
+	}
+
+	botUsername := strings.TrimPrefix(strings.TrimSpace(s.cfg.TelegramAdminBotUsername), "@")
+	if botUsername == "" {
+		botUsername = "qabulgo_admin_bot"
+	}
+	deepLink := fmt.Sprintf("https://t.me/%s?start=link_%s", botUsername, rawToken)
+
+	return &dto.TelegramLinkTokenResponse{
+		Token:       rawToken,
+		DeepLink:    deepLink,
+		BotUsername: botUsername,
+		ExpiresAt:   expiresAt,
+	}, nil
+}
+
+func (s *telegramService) GetAdminTelegramStatus(ctx context.Context, userID uuid.UUID) (*dto.AdminTelegramStatusResponse, error) {
 	botUsername := strings.TrimPrefix(strings.TrimSpace(s.cfg.TelegramAdminBotUsername), "@")
 	if botUsername == "" {
 		botUsername = "qabulgo_admin_bot"
@@ -221,13 +261,64 @@ func (s *telegramService) GetAdminTelegramStatus(ctx context.Context) (*dto.Admi
 	deepLink := fmt.Sprintf("https://t.me/%s", botUsername)
 	isConfigured := s.cfg.TelegramAdminBotToken != ""
 
+	// Fetch current user's linked admin recipient
+	currentRecipient, err := s.telegramRepo.GetAdminRecipientByUserID(ctx, userID)
+	if err != nil {
+		log.Printf("GetAdminRecipientByUserID error: %v\n", err)
+	}
+
+	// Fetch all active admin recipients
+	allRecipients, err := s.telegramRepo.GetAllActiveAdminRecipients(ctx)
+	if err != nil {
+		log.Printf("GetAllActiveAdminRecipients error: %v\n", err)
+	}
+
+	var connectedAdminDTO *dto.AdminTelegramRecipientDTO
+	if currentRecipient != nil && currentRecipient.IsActive {
+		connectedAdminDTO = &dto.AdminTelegramRecipientDTO{
+			ID:                currentRecipient.ID,
+			UserID:            currentRecipient.UserID,
+			TelegramUserID:    currentRecipient.TelegramUserID,
+			TelegramChatID:    currentRecipient.TelegramChatID,
+			TelegramUsername:  currentRecipient.TelegramUsername,
+			TelegramFirstName: currentRecipient.TelegramFirstName,
+			IsActive:          currentRecipient.IsActive,
+			CreatedAt:         currentRecipient.CreatedAt,
+			UpdatedAt:         currentRecipient.UpdatedAt,
+		}
+	}
+
+	recipientDTOs := make([]dto.AdminTelegramRecipientDTO, 0, len(allRecipients))
+	for _, r := range allRecipients {
+		recipientDTOs = append(recipientDTOs, dto.AdminTelegramRecipientDTO{
+			ID:                r.ID,
+			UserID:            r.UserID,
+			TelegramUserID:    r.TelegramUserID,
+			TelegramChatID:    r.TelegramChatID,
+			TelegramUsername:  r.TelegramUsername,
+			TelegramFirstName: r.TelegramFirstName,
+			IsActive:          r.IsActive,
+			CreatedAt:         r.CreatedAt,
+			UpdatedAt:         r.UpdatedAt,
+		})
+	}
+
+	isConnected := connectedAdminDTO != nil || len(recipientDTOs) > 0
+
 	return &dto.AdminTelegramStatusResponse{
 		IsConfigured:    isConfigured,
+		IsConnected:     isConnected,
 		BotUsername:     botUsername,
 		BotName:         "QabulGo Admin Bot",
 		DeepLink:        deepLink,
 		AllowedAdminIDs: s.cfg.TelegramAdminAllowedIDs,
+		ConnectedAdmin:  connectedAdminDTO,
+		Recipients:      recipientDTOs,
 	}, nil
+}
+
+func (s *telegramService) DisconnectAdminRecipient(ctx context.Context, userID uuid.UUID) error {
+	return s.telegramRepo.DisconnectAdminRecipient(ctx, userID)
 }
 
 // ----------------------------------------------------------------------------
@@ -622,16 +713,28 @@ func (s *telegramService) ProcessAdminBotUpdate(ctx context.Context, update *tel
 	return nil
 }
 
-func (s *telegramService) isAuthorizedAdmin(telegramUserID int64) bool {
-	if len(s.cfg.TelegramAdminAllowedIDs) == 0 {
-		return false
+func (s *telegramService) isAuthorizedAdmin(ctx context.Context, telegramUserID int64) bool {
+	// 1. Check DB first for linked active superadmin recipient
+	recipient, err := s.telegramRepo.GetAdminRecipientByTelegramUserID(ctx, telegramUserID)
+	if err == nil && recipient != nil && recipient.IsActive {
+		return true
 	}
+
+	// 2. Fallback to config IDs
 	for _, id := range s.cfg.TelegramAdminAllowedIDs {
 		if id == telegramUserID {
 			return true
 		}
 	}
 	return false
+}
+
+func (s *telegramService) getAdminUserIDByTelegram(ctx context.Context, telegramUserID int64) uuid.UUID {
+	recipient, err := s.telegramRepo.GetAdminRecipientByTelegramUserID(ctx, telegramUserID)
+	if err == nil && recipient != nil && recipient.UserID != uuid.Nil {
+		return recipient.UserID
+	}
+	return s.getSystemSuperAdminUUID(ctx)
 }
 
 func (s *telegramService) handleAdminMessage(ctx context.Context, msg *telegram.Message) error {
@@ -645,13 +748,6 @@ func (s *telegramService) handleAdminMessage(ctx context.Context, msg *telegram.
 		return nil
 	}
 
-	// Authorization Check
-	if !s.isAuthorizedAdmin(fromUser.ID) {
-		text := fmt.Sprintf("⛔️ <b>Ruxsat etilmagan!</b>\n\nSizda QabulGo Nazorat Markazi (Superadmin) botidan foydalanish huquqi yo‘q.\n\nSizning Telegram ID raqamingiz: <code>%d</code>\nUshbu ID'ni backend .env faylidagi <code>%s</code> sozlamasiga qo‘shing.", fromUser.ID, "TELEGRAM_ADMIN_ALLOWED_IDS")
-		_, _ = s.adminBotClient.SendMessage(ctx, chatID, text, nil)
-		return nil
-	}
-
 	text := strings.TrimSpace(msg.Text)
 	if text == "" {
 		return nil
@@ -661,6 +757,56 @@ func (s *telegramService) handleAdminMessage(ctx context.Context, msg *telegram.
 	cmd := strings.ToLower(fields[0])
 	if atIdx := strings.Index(cmd, "@"); atIdx != -1 {
 		cmd = cmd[:atIdx]
+	}
+
+	// 1. Deep Link Token Linking Flow (/start link_<token> or /start <token>)
+	if cmd == "/start" && len(fields) > 1 {
+		rawToken := strings.TrimPrefix(fields[1], "link_")
+		rawToken = strings.TrimSpace(rawToken)
+
+		hasher := sha256.New()
+		hasher.Write([]byte(rawToken))
+		tokenHash := hex.EncodeToString(hasher.Sum(nil))
+
+		tokenRecord, err := s.telegramRepo.GetValidAdminLinkingTokenByHash(ctx, tokenHash)
+		if err != nil {
+			failText := "⚠️ <b>Ulanish tokeni yaroqsiz yoki muddati o‘tgan.</b>\n\nIltimos, QabulGo admin paneliga kiring va qaytadan yangi havola oling."
+			_, _ = s.adminBotClient.SendMessage(ctx, chatID, failText, nil)
+			return nil
+		}
+
+		recipient := &models.AdminTelegramRecipient{
+			ID:                uuid.New(),
+			UserID:            tokenRecord.UserID,
+			TelegramUserID:    fromUser.ID,
+			TelegramChatID:    chatID,
+			TelegramUsername:  fromUser.Username,
+			TelegramFirstName: fromUser.FirstName,
+			IsActive:          true,
+		}
+
+		if err := s.telegramRepo.UpsertAdminRecipient(ctx, recipient); err != nil {
+			log.Printf("Admin recipient saqlashda xatolik: %v\n", err)
+			_, _ = s.adminBotClient.SendMessage(ctx, chatID, "❌ Hisobni ulashda tizim xatoligi yuz berdi. Iltimos qaytadan urinib ko‘ring.", nil)
+			return nil
+		}
+
+		_ = s.telegramRepo.MarkAdminLinkingTokenUsed(ctx, tokenRecord.ID)
+
+		successText := fmt.Sprintf("🛡 <b>Telegram hisobingiz muvaffaqiyatli ulandi!</b>\n\nAssalomu alaykum, <b>%s</b>!\n\n"+
+			"Siz QabulGo tizimining Superadmini sifatida barcha yangi klinika arizalari bo‘yicha bildirishnomalarni olasiz va ularni bevosita ushbu bot orqali tasdiqlashingiz yoki rad etishingiz mumkin.\n\n"+
+			"Sizning Telegram ID: <code>%d</code>", fromUser.FirstName, fromUser.ID)
+		_, _ = s.adminBotClient.SendMessage(ctx, chatID, successText, s.buildAdminMenuMarkup())
+		return nil
+	}
+
+	// 2. Authorization Check for all subsequent actions
+	if !s.isAuthorizedAdmin(ctx, fromUser.ID) {
+		unauthorizedText := fmt.Sprintf("⛔️ <b>Ruxsat etilmagan!</b>\n\nSizda QabulGo Nazorat Markazi (Superadmin) botidan foydalanish huquqi yo‘q.\n\n"+
+			"Sizning Telegram ID raqamingiz: <code>%d</code>\n\n"+
+			"Botdan foydalanish uchun QabulGo admin paneliga kiring va <b>Telegram</b> bo‘limida hisobingizni botga ulang.", fromUser.ID)
+		_, _ = s.adminBotClient.SendMessage(ctx, chatID, unauthorizedText, nil)
+		return nil
 	}
 
 	// Check if in active interactive session (e.g. awaiting rejection reason)
@@ -682,7 +828,7 @@ func (s *telegramService) handleAdminMessage(ctx context.Context, msg *telegram.
 		_ = s.telegramRepo.ClearAdminSession(ctx, fromUser.ID)
 
 		// Execute rejection through AdminService
-		adminUUID := s.getSystemSuperAdminUUID(ctx)
+		adminUUID := s.getAdminUserIDByTelegram(ctx, fromUser.ID)
 		err := s.adminService.RejectClinic(ctx, adminUUID, clinicID, text, "telegram_bot", "TelegramAdminBot/1.0")
 		if err != nil {
 			_, _ = s.adminBotClient.SendMessage(ctx, chatID, fmt.Sprintf("❌ Klinikani rad etishda xatolik: %v", err), nil)
@@ -748,7 +894,7 @@ func (s *telegramService) handleAdminCallbackQuery(ctx context.Context, cb *tele
 	fromUser := cb.From
 	chatID := fromUser.ID
 
-	if !s.isAuthorizedAdmin(fromUser.ID) {
+	if !s.isAuthorizedAdmin(ctx, fromUser.ID) {
 		_ = s.adminBotClient.AnswerCallbackQuery(ctx, cb.ID, "Sizda superadmin ruxsati yo‘q", true)
 		return nil
 	}
@@ -779,7 +925,7 @@ func (s *telegramService) handleAdminCallbackQuery(ctx context.Context, cb *tele
 			return nil
 		}
 
-		adminUUID := s.getSystemSuperAdminUUID(ctx)
+		adminUUID := s.getAdminUserIDByTelegram(ctx, fromUser.ID)
 		err = s.adminService.ApproveClinic(ctx, adminUUID, clinicID, "telegram_bot", "TelegramAdminBot/1.0")
 		if err != nil {
 			_ = s.adminBotClient.AnswerCallbackQuery(ctx, cb.ID, fmt.Sprintf("Xatolik: %v", err), true)
@@ -1172,8 +1318,26 @@ func (s *telegramService) dispatchClinicSubmitted(ctx context.Context, item *mod
 		return nil
 	}
 
-	if len(s.cfg.TelegramAdminAllowedIDs) == 0 {
-		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "TELEGRAM_ADMIN_ALLOWED_IDS belgilanmagan")
+	// 1. Gather all unique target recipient chat IDs (from DB active recipients + config allowed IDs)
+	chatIDsMap := make(map[int64]bool)
+
+	activeRecipients, err := s.telegramRepo.GetAllActiveAdminRecipients(ctx)
+	if err == nil {
+		for _, r := range activeRecipients {
+			if r.TelegramChatID != 0 {
+				chatIDsMap[r.TelegramChatID] = true
+			}
+		}
+	}
+
+	for _, cfgID := range s.cfg.TelegramAdminAllowedIDs {
+		if cfgID != 0 {
+			chatIDsMap[cfgID] = true
+		}
+	}
+
+	if len(chatIDsMap) == 0 {
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Ulangan faol Superadmin Telegram recipientlari topilmadi")
 		return nil
 	}
 
@@ -1218,11 +1382,15 @@ func (s *telegramService) dispatchClinicSubmitted(ctx context.Context, item *mod
 	}
 
 	allSent := true
-	for _, adminChatID := range s.cfg.TelegramAdminAllowedIDs {
+	for adminChatID := range chatIDsMap {
 		_, err := s.adminBotClient.SendMessage(ctx, adminChatID, text, markup)
 		if err != nil {
-			allSent = false
-			log.Printf("Admin %d ga xabar yuborishda xatolik: %v\n", adminChatID, err)
+			if errors.Is(err, telegram.ErrBotBlockedByUser) {
+				_ = s.telegramRepo.DeactivateAdminRecipientByChatID(ctx, adminChatID)
+			} else {
+				allSent = false
+				log.Printf("Admin %d ga xabar yuborishda xatolik: %v\n", adminChatID, err)
+			}
 		}
 	}
 

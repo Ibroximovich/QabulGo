@@ -142,11 +142,45 @@ func (h *TelegramHandler) ToggleNotifications(c *gin.Context) {
 
 // GetAdminStatus returns the Telegram Superadmin Bot configuration status
 func (h *TelegramHandler) GetAdminStatus(c *gin.Context) {
-	resp, err := h.telegramService.GetAdminTelegramStatus(c.Request.Context())
+	userID, _ := middleware.GetCurrentUserID(c)
+	resp, err := h.telegramService.GetAdminTelegramStatus(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("Admin bot statusini olishda xatolik: "+err.Error(), nil))
 		return
 	}
 
 	c.JSON(http.StatusOK, dto.NewSuccessResponse("Admin Telegram holati olindi", resp))
+}
+
+// GenerateAdminLinkToken generates a one-time token and deep link for Superadmin
+func (h *TelegramHandler) GenerateAdminLinkToken(c *gin.Context) {
+	userID, ok := middleware.GetCurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("Autentifikatsiyadan o‘tilmagan", nil))
+		return
+	}
+
+	resp, err := h.telegramService.GenerateAdminLinkingToken(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("Admin telegram ulanish havolasini yaratishda xatolik: "+err.Error(), nil))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.NewSuccessResponse("Admin ulanish havolasi yaratildi", resp))
+}
+
+// DisconnectAdmin disconnects the logged-in Superadmin's linked Telegram
+func (h *TelegramHandler) DisconnectAdmin(c *gin.Context) {
+	userID, ok := middleware.GetCurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("Autentifikatsiyadan o‘tilmagan", nil))
+		return
+	}
+
+	if err := h.telegramService.DisconnectAdminRecipient(c.Request.Context(), userID); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("Telegram ulanishini uzishda xatolik: "+err.Error(), nil))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.NewSuccessResponse("Telegram hisob muvaffaqiyatli uzildi", nil))
 }

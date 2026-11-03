@@ -206,6 +206,8 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 
 				if rc.TelegramHandler != nil {
 					admin.GET("/telegram/status", rc.TelegramHandler.GetAdminStatus)
+					admin.POST("/telegram/link-token", rc.TelegramHandler.GenerateAdminLinkToken)
+					admin.DELETE("/telegram/disconnect", rc.TelegramHandler.DisconnectAdmin)
 				}
 			}
 		}

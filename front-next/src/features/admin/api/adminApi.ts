@@ -39,12 +39,34 @@ export interface AdminClinicListResponse {
   };
 }
 
+export interface AdminTelegramRecipientDTO {
+  id: string;
+  user_id: string;
+  telegram_user_id: number;
+  telegram_chat_id: number;
+  telegram_username: string;
+  telegram_first_name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AdminTelegramStatusResponse {
   is_configured: boolean;
+  is_connected: boolean;
   bot_username: string;
   bot_name: string;
   deep_link: string;
-  allowed_admin_ids: number[];
+  allowed_admin_ids?: number[];
+  connected_admin?: AdminTelegramRecipientDTO;
+  recipients?: AdminTelegramRecipientDTO[];
+}
+
+export interface AdminTelegramLinkTokenResponse {
+  token: string;
+  deep_link: string;
+  bot_username: string;
+  expires_at: string;
 }
 
 export interface AdminPatientListResponse {
@@ -165,8 +187,16 @@ export const adminApi = {
     return apiClient.get<ApiResponse<AdminAppointmentListItem>>(`/admin/appointments/${id}`);
   },
 
-  // Telegram Status
+  // Telegram Status & Linking
   getTelegramStatus() {
     return apiClient.get<ApiResponse<AdminTelegramStatusResponse>>('/admin/telegram/status');
+  },
+
+  generateTelegramLinkToken() {
+    return apiClient.post<ApiResponse<AdminTelegramLinkTokenResponse>>('/admin/telegram/link-token');
+  },
+
+  disconnectTelegram() {
+    return apiClient.delete<ApiResponse<null>>('/admin/telegram/disconnect');
   },
 };

@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   Send,
   CheckCircle2,
@@ -11,14 +12,22 @@ import {
   ShieldCheck,
   Building2,
   Check,
-  X,
   FileText,
   UserCheck,
+  Trash2,
+  Link as LinkIcon,
+  Copy,
 } from 'lucide-react';
 import { adminApi } from '../api/adminApi';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 
 export function AdminTelegramPage() {
+  const queryClient = useQueryClient();
+  const [isLinking, setIsLinking] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<{ deepLink: string; token: string } | null>(null);
+
   const {
     data: statusData,
     isLoading,
@@ -33,6 +42,71 @@ export function AdminTelegramPage() {
     },
     retry: 1,
   });
+
+  // Link Token Mutation
+  const linkMutation = useMutation({
+    mutationFn: async () => {
+      const res = await adminApi.generateTelegramLinkToken();
+      return res.data?.data;
+    },
+    onSuccess: (data) => {
+      if (data?.deep_link) {
+        setGeneratedLink({ deepLink: data.deep_link, token: data.token });
+        if (typeof window !== 'undefined') {
+          try {
+            const opened = window.open(data.deep_link, '_blank');
+            if (opened) {
+              toast.success('Telegram ochilmoqda. Iltimos botda "Start" tugmasini bosing!');
+            } else {
+              toast.info('Telegram ulanish havolasi tayyor', {
+                action: {
+                  label: 'Botga o‘tish',
+                  onClick: () => {
+                    window.location.href = data.deep_link;
+                  },
+                },
+              });
+            }
+          } catch {
+            // ignore window open errors
+          }
+        }
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Ulanish havolasini yaratishda xatolik yuz berdi');
+    },
+    onSettled: () => {
+      setIsLinking(false);
+    },
+  });
+
+  // Disconnect Mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      await adminApi.disconnectTelegram();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminTelegramStatus'] });
+      toast.success('Telegram hisobingiz muvaffaqiyatli uzildi');
+      setShowDisconnectModal(false);
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Ulanishni uzishda xatolik yuz berdi');
+    },
+  });
+
+  const handleConnect = () => {
+    setIsLinking(true);
+    linkMutation.mutate();
+  };
+
+  const copyToClipboard = (text: string) => {
+    if (typeof navigator !== 'undefined') {
+      navigator.clipboard.writeText(text);
+      toast.success('Nusxalandi');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -50,11 +124,8 @@ export function AdminTelegramPage() {
           <h3 className="text-lg font-bold">Backend serverni qayta ishga tushiring</h3>
         </div>
         <p className="text-sm text-amber-800 leading-relaxed">
-          Yangi yaratilgan Telegram API endpointi ishlashi uchun terminalda ishlab turgan Go backendni to‘xtatib (<code className="font-mono font-bold bg-amber-100 px-1.5 py-0.5 rounded">Ctrl + C</code>), qaytadan ishga tushiring:
+          Telegram API endpointi bilan aloqa o‘rnatib bo‘lmadi. Qaytadan tekshirib ko‘ring:
         </p>
-        <pre className="p-3 bg-amber-100/80 rounded-xl font-mono text-xs font-semibold text-amber-950">
-cd D:\QabulGo\back{'\n'}go run cmd/api/main.go
-        </pre>
         <Button onClick={() => refetch()} className="gap-2 bg-[#0866F5] hover:bg-blue-600 text-white">
           <RefreshCw className="w-4 h-4" />
           <span>Qayta tekshirish</span>
@@ -64,9 +135,11 @@ cd D:\QabulGo\back{'\n'}go run cmd/api/main.go
   }
 
   const isConfigured = Boolean(statusData?.is_configured);
+  const isConnected = Boolean(statusData?.is_connected);
   const botUsername = statusData?.bot_username || 'qabulgo_admin_bot';
   const deepLink = statusData?.deep_link || `https://t.me/${botUsername}`;
-  const allowedAdminIDs = statusData?.allowed_admin_ids || [];
+  const connectedAdmin = statusData?.connected_admin;
+  const recipients = statusData?.recipients || [];
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -94,7 +167,7 @@ cd D:\QabulGo\back{'\n'}go run cmd/api/main.go
         </Button>
       </div>
 
-      {/* Main Bot Status Card */}
+      {/* Main Bot Status & Action Card */}
       <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-44 h-44 bg-blue-50 rounded-full blur-2xl pointer-events-none" />
 
@@ -103,20 +176,20 @@ cd D:\QabulGo\back{'\n'}go run cmd/api/main.go
             <div className="flex items-center gap-3">
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                  isConfigured
+                  isConnected
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-amber-50 text-amber-700 border-amber-200'
                 }`}
               >
-                {isConfigured ? (
+                {isConnected ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Faol va ulangan
+                    Ulangan
                   </>
                 ) : (
                   <>
                     <AlertCircle className="w-3.5 h-3.5" />
-                    Sozlanmagan
+                    Ulanmagan
                   </>
                 )}
               </span>
@@ -127,73 +200,179 @@ cd D:\QabulGo\back{'\n'}go run cmd/api/main.go
             </div>
 
             <h2 className="text-xl font-bold text-slate-900">
-              QabulGo Nazorat Markazi (Superadmin Bot)
+              {isConnected
+                ? 'Superadmin hisobingiz botga ulangan'
+                : 'Telegram hisobingizni botga ulang'}
             </h2>
 
             <p className="text-sm text-slate-600 leading-relaxed max-w-xl">
-              Yangi klinika ro‘yxatdan o‘tib, tekshirishga yuborilganda barcha rekvizitlar bilan xabar darhol ushbu botga yuboriladi. 
-              Siz Telegramning o‘zida tugmani bosib klinikani tasdiqlashingiz yoki sababini ko‘rsatib rad etishingiz mumkin.
+              {isConnected
+                ? 'Yangi klinika ro‘yxatdan o‘tib ariza yuborganida, uning rekvizitlari bilan xabar darhol Telegram botingizga yuboriladi. Botdagi tugmalar orqali klinikani tasdiqlashingiz yoki rad etishingiz mumkin.'
+                : 'Klinika arizalari bo‘yicha tezkor xabarlarni olish va ularni Telegram orqali tasdiqlash uchun shaxsiy Telegram hisobingizni bir martalik xavfsiz havola orqali botga ulang.'}
             </p>
           </div>
 
           <div className="shrink-0 flex flex-col sm:flex-row gap-3">
-            <a
-              href={deepLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#229ED9] hover:bg-[#1e8cc0] shadow-sm transition-all"
-            >
-              <Send className="w-4 h-4" />
-              <span>Telegram botni ochish</span>
-              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-            </a>
+            {!isConnected ? (
+              <Button
+                onClick={handleConnect}
+                disabled={isLinking || linkMutation.isPending}
+                className="gap-2 bg-[#0866F5] hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl shadow-sm text-sm font-semibold"
+              >
+                <LinkIcon className={`w-4 h-4 ${isLinking ? 'animate-spin' : ''}`} />
+                <span>{isLinking ? 'Havola tayyorlanmoqda...' : 'Telegram botni ulash'}</span>
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <a
+                  href={deepLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#229ED9] hover:bg-[#1e8cc0] shadow-sm transition-all"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Botni ochish</span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                </a>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDisconnectModal(true)}
+                  className="gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Ulanishni uzish</span>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Allowed Admin IDs Section */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-[#0866F5]" />
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Ruxsat berilgan Superadmin hisoblari</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Faqat ushbu Telegram ID egalari bot orqali klinikani tasdiqlashi yoki rad etishi mumkin
-              </p>
+      {/* Connected Superadmin Profile Card */}
+      {isConnected && (connectedAdmin || recipients.length > 0) && (
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck className="w-5 h-5 text-[#0866F5]" />
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Ulangan Superadmin hisobi</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ushbu Telegram hisobi bot orqali klinikani tasdiqlash va rad etish huquqiga ega
+                </p>
+              </div>
             </div>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Check className="w-3 h-3 inline mr-1" />
+              Faol
+            </span>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-            {allowedAdminIDs.length} ta admin
-          </span>
-        </div>
 
-        {allowedAdminIDs.length === 0 ? (
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-            ⚠️ Hozirda hech qanday Telegram ID ko‘rsatilmagan. Backend <code className="font-mono font-bold">.env</code> faylida <code className="font-mono font-bold">TELEGRAM_ADMIN_ALLOWED_IDS</code> sozlamasiga Telegram ID raqamingizni kiriting.
-          </div>
-        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {allowedAdminIDs.map((id) => (
+            {(connectedAdmin ? [connectedAdmin] : recipients).map((r) => (
               <div
-                key={id}
+                key={r.id || r.telegram_user_id}
                 className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors"
               >
-                <div className="w-9 h-9 rounded-xl bg-blue-100 text-[#0866F5] flex items-center justify-center font-bold text-sm shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#0866F5] flex items-center justify-center font-bold text-sm shrink-0">
                   <UserCheck className="w-5 h-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs text-slate-400 font-medium">Telegram ID</div>
-                  <div className="text-sm font-mono font-bold text-slate-800 truncate">{id}</div>
+                  <div className="text-sm font-bold text-slate-900 truncate">
+                    {r.telegram_first_name || 'Superadmin'}
+                    {r.telegram_username ? (
+                      <span className="text-xs text-slate-400 font-normal ml-1">(@{r.telegram_username})</span>
+                    ) : null}
+                  </div>
+                  <div className="text-xs font-mono font-semibold text-slate-600 mt-0.5">
+                    Telegram ID: <span className="text-[#0866F5]">{r.telegram_user_id}</span>
+                  </div>
+                  {r.created_at && (
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Ulangan: {new Date(r.created_at).toLocaleDateString('uz-UZ')}
+                    </div>
+                  )}
                 </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  <Check className="w-3 h-3" /> Faol
-                </span>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Manual Link Modal if Popup was blocked */}
+      {generatedLink && (
+        <Modal
+          isOpen={Boolean(generatedLink)}
+          onClose={() => setGeneratedLink(null)}
+          title="Telegram Botga Ulanish"
+        >
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Botga ulanish havolasi tayyorlandi. Havolani bosib Telegram ilovasida botni oching va <b>Start</b> tugmasini bosing:
+            </p>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
+              <span className="font-mono text-xs text-slate-700 truncate">{generatedLink.deepLink}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(generatedLink.deepLink)}
+                className="gap-1.5 shrink-0"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Nusxalash</span>
+              </Button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setGeneratedLink(null)}>
+                Yopish
+              </Button>
+              <a
+                href={generatedLink.deepLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setGeneratedLink(null)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#229ED9] hover:bg-[#1e8cc0]"
+              >
+                <Send className="w-4 h-4" />
+                <span>Telegramda ochish</span>
+              </a>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Disconnect Confirmation Modal */}
+      <Modal
+        isOpen={showDisconnectModal}
+        onClose={() => setShowDisconnectModal(false)}
+        title="Telegram Bot ulanishini uzish"
+      >
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Haqiqatan ham Telegram bot ulanishini uzmoqchimisiz? Uzilgandan so‘ng yangi klinika arizalari bo‘yicha Telegram xabarnomalari kelmaydi va bot orqali tasdiqlash imkoni to‘xtatiladi.
+          </p>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDisconnectModal(false)}
+              disabled={disconnectMutation.isPending}
+            >
+              Bekor qilish
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {disconnectMutation.isPending ? 'Uzilmoqda...' : 'Ha, ulanishni uzish'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Capabilities & Instructions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -258,4 +437,3 @@ cd D:\QabulGo\back{'\n'}go run cmd/api/main.go
     </div>
   );
 }
-

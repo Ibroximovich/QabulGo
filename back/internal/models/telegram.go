@@ -96,3 +96,39 @@ func (TelegramAdminSession) TableName() string {
 	return "telegram_admin_sessions"
 }
 
+// AdminTelegramRecipient represents a connected Telegram account for a Superadmin
+type AdminTelegramRecipient struct {
+	ID                uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	UserID            uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	TelegramUserID    int64     `gorm:"type:bigint;not null;index" json:"telegram_user_id"`
+	TelegramChatID    int64     `gorm:"type:bigint;not null;uniqueIndex" json:"telegram_chat_id"`
+	TelegramUsername  string    `gorm:"type:varchar(255)" json:"telegram_username"`
+	TelegramFirstName string    `gorm:"type:varchar(255)" json:"telegram_first_name"`
+	IsActive          bool      `gorm:"type:boolean;not null;default:true" json:"is_active"`
+	CreatedAt         time.Time `gorm:"type:timestamptz;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt         time.Time `gorm:"type:timestamptz;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+
+	User *User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
+}
+
+func (AdminTelegramRecipient) TableName() string {
+	return "admin_telegram_recipients"
+}
+
+// AdminTelegramLinkingToken represents a one-time cryptographic token to link Superadmin to Telegram
+type AdminTelegramLinkingToken struct {
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	UserID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
+	TokenHash string     `gorm:"type:varchar(64);not null;uniqueIndex" json:"token_hash"`
+	IsUsed    bool       `gorm:"type:boolean;not null;default:false" json:"is_used"`
+	ExpiresAt time.Time  `gorm:"type:timestamptz;not null" json:"expires_at"`
+	UsedAt    *time.Time `gorm:"type:timestamptz" json:"used_at,omitempty"`
+	CreatedAt time.Time  `gorm:"type:timestamptz;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+
+	User *User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
+}
+
+func (AdminTelegramLinkingToken) TableName() string {
+	return "admin_telegram_linking_tokens"
+}
+

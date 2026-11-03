@@ -34,6 +34,18 @@ type TelegramRepository interface {
 	IsUpdateProcessed(ctx context.Context, botType string, updateID int64) (bool, error)
 	RecordUpdateProcessed(ctx context.Context, botType string, updateID int64) error
 
+	// Admin Telegram Bot Linking & Recipients
+	CreateAdminLinkingToken(ctx context.Context, token *models.AdminTelegramLinkingToken) error
+	GetValidAdminLinkingTokenByHash(ctx context.Context, tokenHash string) (*models.AdminTelegramLinkingToken, error)
+	MarkAdminLinkingTokenUsed(ctx context.Context, tokenID uuid.UUID) error
+
+	UpsertAdminRecipient(ctx context.Context, recipient *models.AdminTelegramRecipient) error
+	GetAdminRecipientByUserID(ctx context.Context, userID uuid.UUID) (*models.AdminTelegramRecipient, error)
+	GetAdminRecipientByTelegramUserID(ctx context.Context, telegramUserID int64) (*models.AdminTelegramRecipient, error)
+	GetAllActiveAdminRecipients(ctx context.Context) ([]models.AdminTelegramRecipient, error)
+	DisconnectAdminRecipient(ctx context.Context, userID uuid.UUID) error
+	DeactivateAdminRecipientByChatID(ctx context.Context, chatID int64) error
+
 	GetAdminSession(ctx context.Context, telegramUserID int64) (*models.TelegramAdminSession, error)
 	SetAdminSession(ctx context.Context, session *models.TelegramAdminSession) error
 	ClearAdminSession(ctx context.Context, telegramUserID int64) error
@@ -228,5 +240,109 @@ func (r *telegramRepository) ClearAdminSession(ctx context.Context, telegramUser
 	return r.db.WithContext(ctx).
 		Where("telegram_user_id = ?", telegramUserID).
 		Delete(&models.TelegramAdminSession{}).Error
+}
+
+func (r *telegramRepository) CreateAdminLinkingToken(ctx context.Context, token *models.AdminTelegramLinkingToken) error {
+	return r.db.WithContext(ctx).Create(token).Error
+}
+
+func (r *telegramRepository) GetValidAdminLinkingTokenByHash(ctx context.Context, tokenHash string) (*models.AdminTelegramLinkingToken, error) {
+	var token models.AdminTelegramLinkingToken
+	nowUTC := time.Now().UTC()
+	err := r.db.WithContext(ctx).
+		Preload("User").
+		Where("token_hash = ? AND is_used = false AND expires_at > ?", tokenHash, nowUTC).
+		First(&token).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrLinkingTokenNotFound
+		}
+		return nil, err
+	}
+	return &token, nil
+}
+
+func (r *telegramRepository) MarkAdminLinkingTokenUsed(ctx context.Context, tokenID uuid.UUID) error {
+	now := time.Now()
+	return r.db.WithContext(ctx).
+		Model(&models.AdminTelegramLinkingToken{}).
+		Where("id = ?", tokenID).
+		Updates(map[string]any{
+			"is_used": true,
+			"used_at": now,
+		}).Error
+}
+
+func (r *telegramRepository) UpsertAdminRecipient(ctx context.Context, recipient *models.AdminTelegramRecipient) error {
+	recipient.UpdatedAt = time.Now()
+	return r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "user_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"telegram_user_id",
+				"telegram_chat_id",
+				"telegram_username",
+				"telegram_first_name",
+				"is_active",
+				"updated_at",
+			}),
+		}).
+		Create(recipient).Error
+}
+
+func (r *telegramRepository) GetAdminRecipientByUserID(ctx context.Context, userID uuid.UUID) (*models.AdminTelegramRecipient, error) {
+	var recipient models.AdminTelegramRecipient
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND is_active = true", userID).
+		First(&recipient).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &recipient, nil
+}
+
+func (r *telegramRepository) GetAdminRecipientByTelegramUserID(ctx context.Context, telegramUserID int64) (*models.AdminTelegramRecipient, error) {
+	var recipient models.AdminTelegramRecipient
+	err := r.db.WithContext(ctx).
+		Where("telegram_user_id = ? AND is_active = true", telegramUserID).
+		First(&recipient).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &recipient, nil
+}
+
+func (r *telegramRepository) GetAllActiveAdminRecipients(ctx context.Context) ([]models.AdminTelegramRecipient, error) {
+	var list []models.AdminTelegramRecipient
+	err := r.db.WithContext(ctx).
+		Where("is_active = true").
+		Find(&list).Error
+	return list, err
+}
+
+func (r *telegramRepository) DisconnectAdminRecipient(ctx context.Context, userID uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&models.AdminTelegramRecipient{}).
+		Where("user_id = ?", userID).
+		Updates(map[string]any{
+			"is_active":  false,
+			"updated_at": time.Now(),
+		}).Error
+}
+
+func (r *telegramRepository) DeactivateAdminRecipientByChatID(ctx context.Context, chatID int64) error {
+	return r.db.WithContext(ctx).
+		Model(&models.AdminTelegramRecipient{}).
+		Where("telegram_chat_id = ?", chatID).
+		Updates(map[string]any{
+			"is_active":  false,
+			"updated_at": time.Now(),
+		}).Error
 }
 
