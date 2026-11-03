@@ -66,7 +66,7 @@ func setupClinicTestApp() *TestClinicApp {
 	patientService := services.NewPatientService(userRepo)
 	clinicService := services.NewClinicService(clinicRepo, doctorRepo, userRepo, auditRepo)
 	doctorService := services.NewDoctorService(doctorRepo, clinicRepo, specialtyRepo, auditRepo)
-	adminService := services.NewAdminService(clinicRepo, doctorRepo, auditRepo)
+	adminService := services.NewAdminService(clinicRepo, doctorRepo, auditRepo, nil)
 	specialtyService := services.NewSpecialtyService(specialtyRepo)
 	storageService := services.NewLocalStorageService("uploads_test", "/uploads")
 	publicSearchRepo := NewMockPublicSearchRepository(clinicRepo, doctorRepo, specialtyRepo)

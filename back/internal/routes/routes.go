@@ -178,11 +178,31 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 			admin.Use(middleware.Auth(rc.Config))
 			admin.Use(middleware.RequireRole(models.RoleSuperAdmin))
 			{
+				// Dashboard
+				admin.GET("/dashboard/summary", rc.AdminHandler.GetDashboardSummary)
+				admin.GET("/dashboard/analytics", rc.AdminHandler.GetDashboardAnalytics)
+
+				// Clinics
 				admin.GET("/clinics", rc.AdminHandler.ListClinics)
 				admin.GET("/clinics/:id", rc.AdminHandler.GetClinicDetails)
+				admin.GET("/clinics/:id/doctors", rc.AdminHandler.GetClinicDoctors)
+				admin.GET("/clinics/:id/appointments", rc.AdminHandler.GetClinicAppointments)
+				admin.GET("/clinics/:id/analytics", rc.AdminHandler.GetClinicAnalytics)
 				admin.POST("/clinics/:id/approve", rc.AdminHandler.ApproveClinic)
 				admin.POST("/clinics/:id/reject", rc.AdminHandler.RejectClinic)
 				admin.POST("/clinics/:id/suspend", rc.AdminHandler.SuspendClinic)
+
+				// Patients
+				admin.GET("/patients", rc.AdminHandler.ListPatients)
+				admin.GET("/patients/:id", rc.AdminHandler.GetPatientDetails)
+
+				// Doctors
+				admin.GET("/doctors", rc.AdminHandler.ListDoctors)
+				admin.GET("/doctors/:id", rc.AdminHandler.GetDoctorDetails)
+
+				// Platform Appointments
+				admin.GET("/appointments", rc.AdminHandler.ListAppointments)
+				admin.GET("/appointments/:id", rc.AdminHandler.GetAppointmentDetails)
 
 				if rc.TelegramHandler != nil {
 					admin.GET("/telegram/status", rc.TelegramHandler.GetAdminStatus)

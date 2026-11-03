@@ -35,9 +35,13 @@ export function formatDateTimeUz(dateInput: string | Date | undefined | null): s
   }
 }
 
+export const formatDateTime = formatDateTimeUz;
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('uz-UZ').format(amount) + " so'm";
 }
+
+export const formatPrice = formatCurrency;
 
 export function getInitials(firstName?: string, lastName?: string): string {
   const f = firstName?.trim().charAt(0).toUpperCase() || '';

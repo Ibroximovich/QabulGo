@@ -68,6 +68,7 @@ func main() {
 	appointmentRepo := repositories.NewAppointmentRepository(db)
 	telegramRepo := repositories.NewTelegramRepository(db)
 	outboxRepo := repositories.NewNotificationOutboxRepository(db)
+	adminRepo := repositories.NewAdminRepository(db)
 
 	// 4. Services initsializatsiyasi
 	emailService := services.NewEmailService(cfg)
@@ -76,7 +77,7 @@ func main() {
 	patientService := services.NewPatientService(userRepo)
 	clinicService := services.NewClinicService(clinicRepo, doctorRepo, userRepo, auditRepo, outboxRepo)
 	doctorService := services.NewDoctorService(doctorRepo, clinicRepo, specialtyRepo, auditRepo)
-	adminService := services.NewAdminService(clinicRepo, doctorRepo, auditRepo)
+	adminService := services.NewAdminService(clinicRepo, doctorRepo, auditRepo, adminRepo)
 	specialtyService := services.NewSpecialtyService(specialtyRepo)
 	storageService := services.NewLocalStorageService("uploads", "/uploads")
 	publicSearchService := services.NewPublicSearchService(publicSearchRepo, doctorRepo)

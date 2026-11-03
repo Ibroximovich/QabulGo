@@ -13,11 +13,19 @@ import {
   Eye,
   Check,
   Ban,
+  Stethoscope,
+  CalendarCheck,
+  TrendingUp,
+  Info,
+  Phone,
+  Mail,
+  FileText,
+  User,
 } from 'lucide-react';
 import { adminApi } from '../api/adminApi';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { formatDate } from '@/lib/utils/formatters';
+import { formatDate, formatDateTime, formatPrice } from '@/lib/utils/formatters';
 import { getMediaUrl } from '@/lib/utils/media';
 
 const STATUS_TABS = [
@@ -37,6 +45,7 @@ export function AdminClinicsPage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [detailClinicId, setDetailClinicId] = useState<string | null>(queryClinicId || null);
+  const [detailTab, setDetailTab] = useState<'info' | 'doctors' | 'appointments' | 'analytics'>('info');
 
   useEffect(() => {
     if (queryClinicId) {
@@ -68,6 +77,36 @@ export function AdminClinicsPage() {
       return res.data?.data || null;
     },
     enabled: Boolean(detailClinicId),
+  });
+
+  const { data: clinicDoctors, isLoading: isLoadingDoctors } = useQuery({
+    queryKey: ['adminClinicDoctors', detailClinicId],
+    queryFn: async () => {
+      if (!detailClinicId) return [];
+      const res = await adminApi.getClinicDoctors(detailClinicId);
+      return res.data?.data || [];
+    },
+    enabled: Boolean(detailClinicId && detailTab === 'doctors'),
+  });
+
+  const { data: clinicAppointments, isLoading: isLoadingAppointments } = useQuery({
+    queryKey: ['adminClinicAppointments', detailClinicId],
+    queryFn: async () => {
+      if (!detailClinicId) return [];
+      const res = await adminApi.getClinicAppointments(detailClinicId);
+      return res.data?.data || [];
+    },
+    enabled: Boolean(detailClinicId && detailTab === 'appointments'),
+  });
+
+  const { data: clinicAnalytics, isLoading: isLoadingAnalytics } = useQuery({
+    queryKey: ['adminClinicAnalytics', detailClinicId],
+    queryFn: async () => {
+      if (!detailClinicId) return null;
+      const res = await adminApi.getClinicAnalytics(detailClinicId);
+      return res.data?.data || null;
+    },
+    enabled: Boolean(detailClinicId && detailTab === 'analytics'),
   });
 
   const approveMutation = useMutation({
@@ -327,87 +366,372 @@ export function AdminClinicsPage() {
       {detailClinicId && (
         <Modal
           isOpen={Boolean(detailClinicId)}
-          onClose={() => setDetailClinicId(null)}
-          title="Klinika tafsilotlari"
+          onClose={() => {
+            setDetailClinicId(null);
+            setDetailTab('info');
+          }}
+          title="Klinika boshqaruvi va ma’lumotlari"
         >
           {isLoadingDetails || !detailsData ? (
-            <div className="p-8 text-center text-slate-500">Yuklanmoqda...</div>
+            <div className="p-8 text-center text-slate-500">
+              <div className="w-6 h-6 border-2 border-[#0866F5] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              Yuklanmoqda...
+            </div>
           ) : (
             <div className="space-y-4 text-xs">
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-                {detailsData.clinic.logo_url && (
-                  <img
-                    src={getMediaUrl(detailsData.clinic.logo_url)}
-                    alt={detailsData.clinic.name}
-                    className="w-12 h-12 rounded-xl object-contain border border-slate-200"
-                  />
-                )}
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {detailsData.clinic.name}
-                  </h3>
-                  <p className="text-slate-500">{detailsData.clinic.address}</p>
+              {/* Clinic Header */}
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  {detailsData.clinic.logo_url ? (
+                    <img
+                      src={getMediaUrl(detailsData.clinic.logo_url)}
+                      alt={detailsData.clinic.name}
+                      className="w-12 h-12 rounded-xl object-contain border border-slate-200 bg-white"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#0866F5] font-black text-base flex items-center justify-center border border-blue-100">
+                      {detailsData.clinic.name[0]}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      {detailsData.clinic.name}
+                    </h3>
+                    <p className="text-slate-500 text-[11px]">{detailsData.clinic.address}</p>
+                  </div>
                 </div>
+                <div>{renderStatusBadge(detailsData.clinic.status)}</div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl">
-                <div>
-                  <span className="text-slate-500 block">Status:</span>
-                  <div className="mt-1">{renderStatusBadge(detailsData.clinic.status)}</div>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Shifokorlar soni:</span>
-                  <span className="font-bold text-slate-900 mt-1 block">
-                    {detailsData.clinic.doctors_count} nafar
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Telefon:</span>
-                  <span className="font-semibold text-slate-900 mt-0.5 block">
-                    {detailsData.clinic.phone}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Email:</span>
-                  <span className="font-semibold text-slate-900 mt-0.5 block">
-                    {detailsData.clinic.email || '—'}
-                  </span>
-                </div>
+              {/* Detail Tabs */}
+              <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('info')}
+                  className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 ${
+                    detailTab === 'info'
+                      ? 'bg-[#0866F5] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  <Info className="w-3.5 h-3.5" />
+                  Ma’lumot
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('doctors')}
+                  className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 ${
+                    detailTab === 'doctors'
+                      ? 'bg-[#0866F5] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  <Stethoscope className="w-3.5 h-3.5" />
+                  Shifokorlar
+                  {clinicDoctors && clinicDoctors.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-current">
+                      {clinicDoctors.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('appointments')}
+                  className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 ${
+                    detailTab === 'appointments'
+                      ? 'bg-[#0866F5] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  <CalendarCheck className="w-3.5 h-3.5" />
+                  Bronlar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('analytics')}
+                  className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 ${
+                    detailTab === 'analytics'
+                      ? 'bg-[#0866F5] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  Tahlil
+                </button>
               </div>
 
-              {detailsData.clinic.rejection_reason && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800">
-                  <span className="font-semibold block mb-0.5">Rad etish sababi:</span>
-                  {detailsData.clinic.rejection_reason}
+              {/* Tab 1: Overview */}
+              {detailTab === 'info' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Klinika nomi:</span>
+                      <span className="font-semibold text-slate-900 block mt-0.5">
+                        {detailsData.clinic.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Shifokorlar soni:</span>
+                      <span className="font-bold text-slate-900 block mt-0.5">
+                        {detailsData.clinic.doctors_count} nafar
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Telefon:</span>
+                      <span className="font-semibold text-slate-900 block mt-0.5">
+                        {detailsData.clinic.phone}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Email:</span>
+                      <span className="font-semibold text-slate-900 block mt-0.5">
+                        {detailsData.clinic.email || '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Hudud / Tuman:</span>
+                      <span className="font-semibold text-slate-900 block mt-0.5">
+                        {detailsData.clinic.region}, {detailsData.clinic.district}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Ariza sanasi:</span>
+                      <span className="font-semibold text-slate-900 block mt-0.5">
+                        {formatDate(detailsData.clinic.created_at)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {detailsData.clinic.rejection_reason && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800">
+                      <span className="font-semibold block mb-0.5">Rad etish / Bloklash sababi:</span>
+                      {detailsData.clinic.rejection_reason}
+                    </div>
+                  )}
+
+                  {/* Review History */}
+                  {detailsData.reviews && detailsData.reviews.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <span className="font-bold text-slate-800 block text-xs">
+                        Tekshiruvlar tarixi (Audit)
+                      </span>
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                        {detailsData.reviews.map((rev) => (
+                          <div
+                            key={rev.id}
+                            className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col gap-0.5"
+                          >
+                            <div className="flex items-center justify-between font-semibold">
+                              <span className="uppercase text-[10px] text-slate-700">
+                                Qaror: {rev.decision}
+                              </span>
+                              <span className="text-slate-400 text-[10px]">
+                                {formatDate(rev.reviewed_at)}
+                              </span>
+                            </div>
+                            {rev.reason && (
+                              <p className="text-slate-600 italic">"{rev.reason}"</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Review History */}
-              {detailsData.reviews && detailsData.reviews.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  <span className="font-bold text-slate-800 block">
-                    Tekshiruvlar tarixi (Audit)
-                  </span>
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                    {detailsData.reviews.map((rev) => (
-                      <div
-                        key={rev.id}
-                        className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col gap-0.5"
-                      >
-                        <div className="flex items-center justify-between font-semibold">
-                          <span className="uppercase text-[10px] text-slate-700">
-                            Qaror: {rev.decision}
-                          </span>
-                          <span className="text-slate-400 text-[10px]">
-                            {formatDate(rev.reviewed_at)}
+              {/* Tab 2: Clinic Doctors */}
+              {detailTab === 'doctors' && (
+                <div className="space-y-3">
+                  {isLoadingDoctors ? (
+                    <div className="p-8 text-center text-slate-400">
+                      <div className="w-6 h-6 border-2 border-[#0866F5] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      Shifokorlar yuklanmoqda...
+                    </div>
+                  ) : !clinicDoctors || clinicDoctors.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
+                      <Stethoscope className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      Bu klinikada hozircha shifokorlar mavjud emas
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                      {clinicDoctors.map((doc) => (
+                        <div
+                          key={doc.clinic_doctor_id}
+                          className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3"
+                        >
+                          <div className="flex items-center gap-3">
+                            {doc.photo_url ? (
+                              <img
+                                src={getMediaUrl(doc.photo_url)}
+                                alt={doc.first_name}
+                                className="w-10 h-10 rounded-xl object-cover border border-slate-200 bg-white"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#0866F5] font-black text-xs flex items-center justify-center">
+                                {(doc.first_name?.[0] || 'D').toUpperCase()}
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-bold text-slate-900 text-xs">
+                                {doc.first_name} {doc.last_name}
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                {doc.specialty_name || 'Umumiy'} • {doc.experience_years} yil tajriba
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-slate-900 text-xs block">
+                              {formatPrice(doc.consultation_price)}
+                            </span>
+                            <span
+                              className={`inline-block mt-0.5 px-1.5 py-0.2 rounded-md text-[10px] font-semibold ${
+                                doc.is_active
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {doc.is_active ? 'Faol' : 'Nofaol'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: Clinic Appointments */}
+              {detailTab === 'appointments' && (
+                <div className="space-y-3">
+                  {isLoadingAppointments ? (
+                    <div className="p-8 text-center text-slate-400">
+                      <div className="w-6 h-6 border-2 border-[#0866F5] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      Bronlar yuklanmoqda...
+                    </div>
+                  ) : !clinicAppointments || clinicAppointments.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
+                      <CalendarCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      Klinika bo‘yicha hozircha bronlar mavjud emas
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                      {clinicAppointments.map((app) => (
+                        <div
+                          key={app.id}
+                          className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-900 text-xs">
+                              {app.patient_name} —{' '}
+                              <span className="text-[#0866F5]">{app.doctor_name}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                              <span>{app.specialty_name || 'Shifokor'}</span>
+                              <span>•</span>
+                              <span>
+                                {formatDate(app.appointment_date)} {app.start_time}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-slate-900 text-xs block">
+                              {formatPrice(app.consultation_price)}
+                            </span>
+                            <span className="text-[10px] uppercase font-semibold text-slate-500">
+                              {app.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 4: Clinic Analytics */}
+              {detailTab === 'analytics' && (
+                <div className="space-y-4">
+                  {isLoadingAnalytics || !clinicAnalytics ? (
+                    <div className="p-8 text-center text-slate-400">
+                      <div className="w-6 h-6 border-2 border-[#0866F5] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      Statistika yuklanmoqda...
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* KPI cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                          <span className="text-slate-400 text-[10px] block">Jami bronlar</span>
+                          <span className="text-base font-black text-slate-900 block mt-0.5">
+                            {clinicAnalytics.total_appointments}
                           </span>
                         </div>
-                        {rev.reason && (
-                          <p className="text-slate-600 italic">"{rev.reason}"</p>
+                        <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-center">
+                          <span className="text-amber-700 text-[10px] block">Kelgusi</span>
+                          <span className="text-base font-black text-amber-900 block mt-0.5">
+                            {clinicAnalytics.upcoming_appointments}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-center">
+                          <span className="text-emerald-700 text-[10px] block">Yakunlangan</span>
+                          <span className="text-base font-black text-emerald-900 block mt-0.5">
+                            {clinicAnalytics.completed_appointments}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200 text-center">
+                          <span className="text-blue-700 text-[10px] block">Taxminiy hajm</span>
+                          <span className="text-xs font-black text-blue-900 block mt-1">
+                            {formatPrice(clinicAnalytics.estimated_total_revenue)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Top Doctors */}
+                      <div>
+                        <span className="font-bold text-slate-800 text-xs block mb-2">
+                          Yetakchi shifokorlar (bronlar soni bo‘yicha)
+                        </span>
+                        {!clinicAnalytics.top_doctors || clinicAnalytics.top_doctors.length === 0 ? (
+                          <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl text-xs">
+                            Yetakchi shifokorlar mavjud emas
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                            {clinicAnalytics.top_doctors.map((td, idx) => (
+                              <div
+                                key={td.doctor_id}
+                                className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-blue-100 text-[#0866F5] font-black text-[10px] flex items-center justify-center">
+                                    {idx + 1}
+                                  </span>
+                                  <div>
+                                    <span className="font-bold text-slate-900 block">
+                                      {td.doctor_name}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">
+                                      {td.specialty_name || 'Umumiy'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="font-bold text-[#0866F5]">
+                                  {td.bookings_count} ta bron
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

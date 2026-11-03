@@ -19,29 +19,120 @@ var (
 )
 
 type AdminService interface {
+	GetDashboardSummary(ctx context.Context) (*dto.AdminDashboardSummaryDTO, error)
+	GetDashboardAnalytics(ctx context.Context, filter *dto.AdminDashboardAnalyticsFilter) (*dto.AdminDashboardAnalyticsDTO, error)
 	ListClinics(ctx context.Context, filter *dto.AdminClinicFilter) ([]dto.ClinicSummaryDTO, int64, error)
 	GetClinicDetails(ctx context.Context, clinicID uuid.UUID) (*dto.ClinicDetailDTO, []models.ClinicVerificationReview, error)
+	GetClinicDoctors(ctx context.Context, clinicID uuid.UUID) ([]dto.AdminClinicDoctorItemDTO, error)
+	GetClinicAppointments(ctx context.Context, clinicID uuid.UUID, filter *dto.AdminAppointmentFilter) ([]dto.AdminAppointmentListItemDTO, int64, error)
+	GetClinicAnalytics(ctx context.Context, clinicID uuid.UUID) (*dto.AdminClinicAnalyticsDTO, error)
 	ApproveClinic(ctx context.Context, adminID, clinicID uuid.UUID, ipAddress, userAgent string) error
 	RejectClinic(ctx context.Context, adminID, clinicID uuid.UUID, reason string, ipAddress, userAgent string) error
 	SuspendClinic(ctx context.Context, adminID, clinicID uuid.UUID, reason string, ipAddress, userAgent string) error
+	ListPatients(ctx context.Context, filter *dto.AdminPatientFilter) ([]dto.AdminPatientListItemDTO, int64, error)
+	GetPatientDetails(ctx context.Context, patientID uuid.UUID) (*dto.AdminPatientDetailDTO, error)
+	ListDoctors(ctx context.Context, filter *dto.AdminDoctorFilter) ([]dto.AdminDoctorListItemDTO, int64, error)
+	GetDoctorDetails(ctx context.Context, doctorID uuid.UUID) (*dto.AdminDoctorDetailDTO, error)
+	ListAppointments(ctx context.Context, filter *dto.AdminAppointmentFilter) ([]dto.AdminAppointmentListItemDTO, int64, error)
+	GetAppointmentDetails(ctx context.Context, appointmentID uuid.UUID) (*dto.AdminAppointmentListItemDTO, error)
 }
 
 type adminService struct {
 	clinicRepo repositories.ClinicRepository
 	doctorRepo repositories.DoctorRepository
 	auditRepo  repositories.AuditRepository
+	adminRepo  repositories.AdminRepository
 }
 
 func NewAdminService(
 	clinicRepo repositories.ClinicRepository,
 	doctorRepo repositories.DoctorRepository,
 	auditRepo repositories.AuditRepository,
+	adminRepo repositories.AdminRepository,
 ) AdminService {
 	return &adminService{
 		clinicRepo: clinicRepo,
 		doctorRepo: doctorRepo,
 		auditRepo:  auditRepo,
+		adminRepo:  adminRepo,
 	}
+}
+
+func (s *adminService) GetDashboardSummary(ctx context.Context) (*dto.AdminDashboardSummaryDTO, error) {
+	if s.adminRepo == nil {
+		return nil, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetDashboardSummary(ctx)
+}
+
+func (s *adminService) GetDashboardAnalytics(ctx context.Context, filter *dto.AdminDashboardAnalyticsFilter) (*dto.AdminDashboardAnalyticsDTO, error) {
+	if s.adminRepo == nil {
+		return nil, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetDashboardAnalytics(ctx, filter)
+}
+
+func (s *adminService) GetClinicDoctors(ctx context.Context, clinicID uuid.UUID) ([]dto.AdminClinicDoctorItemDTO, error) {
+	if s.adminRepo == nil {
+		return nil, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetClinicDoctors(ctx, clinicID)
+}
+
+func (s *adminService) GetClinicAppointments(ctx context.Context, clinicID uuid.UUID, filter *dto.AdminAppointmentFilter) ([]dto.AdminAppointmentListItemDTO, int64, error) {
+	if s.adminRepo == nil {
+		return nil, 0, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetClinicAppointments(ctx, clinicID, filter)
+}
+
+func (s *adminService) GetClinicAnalytics(ctx context.Context, clinicID uuid.UUID) (*dto.AdminClinicAnalyticsDTO, error) {
+	if s.adminRepo == nil {
+		return nil, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetClinicAnalytics(ctx, clinicID)
+}
+
+func (s *adminService) ListPatients(ctx context.Context, filter *dto.AdminPatientFilter) ([]dto.AdminPatientListItemDTO, int64, error) {
+	if s.adminRepo == nil {
+		return nil, 0, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.ListPatients(ctx, filter)
+}
+
+func (s *adminService) GetPatientDetails(ctx context.Context, patientID uuid.UUID) (*dto.AdminPatientDetailDTO, error) {
+	if s.adminRepo == nil {
+		return nil, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetPatientDetails(ctx, patientID)
+}
+
+func (s *adminService) ListDoctors(ctx context.Context, filter *dto.AdminDoctorFilter) ([]dto.AdminDoctorListItemDTO, int64, error) {
+	if s.adminRepo == nil {
+		return nil, 0, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.ListDoctors(ctx, filter)
+}
+
+func (s *adminService) GetDoctorDetails(ctx context.Context, doctorID uuid.UUID) (*dto.AdminDoctorDetailDTO, error) {
+	if s.adminRepo == nil {
+		return nil, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetDoctorDetails(ctx, doctorID)
+}
+
+func (s *adminService) ListAppointments(ctx context.Context, filter *dto.AdminAppointmentFilter) ([]dto.AdminAppointmentListItemDTO, int64, error) {
+	if s.adminRepo == nil {
+		return nil, 0, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.ListAppointments(ctx, filter)
+}
+
+func (s *adminService) GetAppointmentDetails(ctx context.Context, appointmentID uuid.UUID) (*dto.AdminAppointmentListItemDTO, error) {
+	if s.adminRepo == nil {
+		return nil, errors.New("admin repository mavjud emas")
+	}
+	return s.adminRepo.GetAppointmentDetails(ctx, appointmentID)
 }
 
 func (s *adminService) ListClinics(ctx context.Context, filter *dto.AdminClinicFilter) ([]dto.ClinicSummaryDTO, int64, error) {
