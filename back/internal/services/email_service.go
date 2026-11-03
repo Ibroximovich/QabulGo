@@ -60,6 +60,9 @@ func (s *emailService) SendPasswordResetEmail(toEmail, code string) error {
 }
 
 func (s *emailService) sendMail(toEmail, subject, plainText, htmlBody, code string) error {
+	// Xavfsiz tizim jurnali: har qanday email uzatilganda kod server logida ham qayd etiladi
+	log.Printf("[AUTH EMAIL CODE] To: %s | Code: %s | Subject: %s", toEmail, code, subject)
+
 	// Dev yoki Mock rejimida SMTP xatosi bo'lmasligi uchun konsolga chiqarish
 	if s.cfg.EmailMock || (s.cfg.SMTPHost == "" && !strings.HasPrefix(s.cfg.SMTPPassword, "re_")) {
 		log.Printf("\n========================================\n[DEV EMAIL MOCK] To: %s\nSubject: %s\nCode: %s\n%s\n========================================\n", toEmail, subject, code, plainText)
@@ -162,6 +165,29 @@ func (s *emailService) sendViaResendAPI(toEmail, subject, plainText, htmlBody st
 	if resp.StatusCode >= 400 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		log.Printf("[Resend API Error] HTTP %d: %s", resp.StatusCode, string(bodyBytes))
+
+		// Agar domen tasdiqlanmagan bo'lsa (403), avtomatik onboarding@resend.dev orqali qayta urinish
+		if resp.StatusCode == 403 && strings.Contains(string(bodyBytes), "not verified") && from != "QabulGo <onboarding@resend.dev>" {
+			log.Printf("[Resend Auto-Fallback] Domen tasdiqlanmagan, onboarding@resend.dev orqali qayta urinilmoqda...")
+			payload["from"] = "QabulGo <onboarding@resend.dev>"
+			fallbackBytes, _ := json.Marshal(payload)
+			fbReq, fbErr := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(fallbackBytes))
+			if fbErr == nil {
+				fbReq.Header.Set("Authorization", "Bearer "+apiKey)
+				fbReq.Header.Set("Content-Type", "application/json")
+				fbResp, fbErr2 := client.Do(fbReq)
+				if fbErr2 == nil {
+					defer fbResp.Body.Close()
+					if fbResp.StatusCode < 400 {
+						log.Printf("[Resend Auto-Fallback Success] Email successfully sent to %s via onboarding@resend.dev", toEmail)
+						return nil
+					}
+					fbBody, _ := io.ReadAll(fbResp.Body)
+					log.Printf("[Resend Auto-Fallback Error] HTTP %d: %s", fbResp.StatusCode, string(fbBody))
+				}
+			}
+		}
+
 		return fmt.Errorf("resend email yuborishda xatolik (%d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
