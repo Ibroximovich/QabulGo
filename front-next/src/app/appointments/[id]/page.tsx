@@ -4,6 +4,10 @@ import { AppointmentDetailPage } from '@/features/appointments/pages/Appointment
 export const metadata = {
   title: 'Qabul tafsilotlari — QabulGo',
   description: 'Shifokor qabuli tafsilotlari va holati',
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function AppointmentPage() {
