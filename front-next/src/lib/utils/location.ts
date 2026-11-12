@@ -28,6 +28,10 @@ export function isValidMapLocationUrl(url: string): boolean {
   }
 }
 
+function isValidCoordinate(lat: number, lon: number): boolean {
+  return !isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 && (lat !== 0 || lon !== 0);
+}
+
 /**
  * Xarita URL manzilidan (Yandex yoki Google Maps) koordinatalarni (latitude va longitude) ajratib olish
  */
@@ -37,32 +41,52 @@ export function extractCoordinatesFromUrl(url?: string | null): { latitude: numb
   try {
     const decoded = decodeURIComponent(url);
 
-    // 1. Yandex: ll=longitude,latitude yoki pt=longitude,latitude
-    const llMatch = decoded.match(/[?&](?:ll|pt)=([0-9.]+)[,%]([0-9.]+)/i);
+    // 1. Google /place/latitude,longitude or /place/latitude+longitude
+    const placeMatch = decoded.match(/\/place\/(-?\d+(?:\.\d+)?)[,+ ](-?\d+(?:\.\d+)?)/i);
+    if (placeMatch) {
+      const lat = parseFloat(placeMatch[1]);
+      const lon = parseFloat(placeMatch[2]);
+      if (isValidCoordinate(lat, lon)) {
+        return { latitude: lat, longitude: lon };
+      }
+    }
+
+    // 2. Yandex: ll=longitude,latitude yoki pt=longitude,latitude (Yandex URLlarida avval lon, keyin lat)
+    const llMatch = decoded.match(/[?&](?:ll|pt)=(-?\d+(?:\.\d+)?)[,%](-?\d+(?:\.\d+)?)/i);
     if (llMatch) {
       const lon = parseFloat(llMatch[1]);
       const lat = parseFloat(llMatch[2]);
-      if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+      if (isValidCoordinate(lat, lon)) {
         return { latitude: lat, longitude: lon };
       }
     }
 
-    // 2. Google: @latitude,longitude,
-    const atMatch = decoded.match(/@(-?[0-9.]+),(-?[0-9.]+)/);
+    // 3. Google: @latitude,longitude,
+    const atMatch = decoded.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
     if (atMatch) {
       const lat = parseFloat(atMatch[1]);
       const lon = parseFloat(atMatch[2]);
-      if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+      if (isValidCoordinate(lat, lon)) {
         return { latitude: lat, longitude: lon };
       }
     }
 
-    // 3. Google Maps q=latitude,longitude
-    const qMatch = decoded.match(/[?&]q=(-?[0-9.]+),(-?[0-9.]+)/i);
+    // 4. Google Maps q=latitude,longitude yoki daddr=latitude,longitude
+    const qMatch = decoded.match(/[?&](?:q|daddr)=(-?\d+(?:\.\d+)?)[,+ ](-?\d+(?:\.\d+)?)/i);
     if (qMatch) {
       const lat = parseFloat(qMatch[1]);
       const lon = parseFloat(qMatch[2]);
-      if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+      if (isValidCoordinate(lat, lon)) {
+        return { latitude: lat, longitude: lon };
+      }
+    }
+
+    // 5. Google Data parameter (!3dlatitude!4dlongitude)
+    const dataMatch = decoded.match(/!3d(-?\d+(?:\.\d+)?)(?:!4d|%214d)(-?\d+(?:\.\d+)?)/i);
+    if (dataMatch) {
+      const lat = parseFloat(dataMatch[1]);
+      const lon = parseFloat(dataMatch[2]);
+      if (isValidCoordinate(lat, lon)) {
         return { latitude: lat, longitude: lon };
       }
     }

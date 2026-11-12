@@ -376,121 +376,91 @@ export function ClinicSearchPage() {
 
             {/* Map View */}
             {viewMode === 'map' && (
-              <div className="space-y-4">
-                {selectedClinic ? (
-                  /* Karta tanlanganda: Desktopda chapda Xarita, o'ngda to'liq ma'lumot (Side-by-Side) */
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                    {/* Chap ustun: Xarita */}
-                    <div className="lg:col-span-7 xl:col-span-8 space-y-3">
-                      <InteractiveMap
-                        clinics={clinics}
-                        userLocation={userLocation}
-                        selectedClinicId={selectedClinicId}
-                        onSelectClinic={(id) => setSelectedClinicId(id)}
-                        height="680px"
-                      />
-
-                      {/* Xarita ostidagi tezkor klinika tanlash tugmalari */}
-                      <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs">
-                        <div className="flex items-center justify-between mb-2 px-1">
-                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Xaritadagi klinikalar ({clinics.length}):
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedClinicId(null)}
-                            className="text-[11px] text-brand-blue hover:underline font-semibold"
-                          >
-                            Xaritani to‘liq ochish
-                          </button>
-                        </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                          {clinics.map((c) => {
-                            const isSel = selectedClinic?.id === c.id;
-                            return (
-                              <button
-                                key={c.id}
-                                type="button"
-                                onClick={() => setSelectedClinicId(c.id)}
-                                className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                                  isSel
-                                    ? 'bg-brand-navy text-white border-brand-navy shadow-xs ring-2 ring-brand-blue/30 scale-102'
-                                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                }`}
-                              >
-                                <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
-                                <span className="truncate max-w-[150px]">{c.name}</span>
-                                {c.region && (
-                                  <span
-                                    className={`text-[10px] ${isSel ? 'text-slate-300' : 'text-slate-400'}`}
-                                  >
-                                    ({c.region})
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* O'ng ustun (Desktopda): Tanlangan klinikaning to'liq ma'lumot kartasi */}
-                    <div className="hidden lg:block lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24">
-                      <ClinicMapDetailCard
-                        clinic={selectedClinic}
-                        onClose={() => setSelectedClinicId(null)}
-                      />
-                    </div>
-
-                    {/* Mobilda: Pastdan chiquvchi modal (Bottom Sheet Drawer) */}
-                    <div className="lg:hidden fixed inset-x-0 bottom-0 z-50 p-3 max-h-[85vh] overflow-y-auto bg-black/40 backdrop-blur-xs flex flex-col justify-end">
-                      <div className="max-w-md mx-auto w-full">
-                        <ClinicMapDetailCard
-                          clinic={selectedClinic}
-                          onClose={() => setSelectedClinicId(null)}
-                        />
-                      </div>
-                    </div>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Xarita va uning ostidagi klinikalar ro'yxati */}
+                <div
+                  className={`space-y-3 transition-all duration-300 ${
+                    selectedClinic ? 'lg:col-span-7 xl:col-span-8' : 'lg:col-span-12'
+                  }`}
+                >
+                  <div className="relative w-full">
+                    <InteractiveMap
+                      clinics={clinics}
+                      userLocation={userLocation}
+                      selectedClinicId={selectedClinicId}
+                      onSelectClinic={(id) => setSelectedClinicId(id)}
+                      height={selectedClinic ? '680px' : '700px'}
+                    />
                   </div>
-                ) : (
-                  /* Dastlabki holat: Xarita 100% to'liq kenglikni egallaydi */
-                  <div className="space-y-3">
-                    <div className="relative w-full">
-                      <InteractiveMap
-                        clinics={clinics}
-                        userLocation={userLocation}
-                        selectedClinicId={selectedClinicId}
-                        onSelectClinic={(id) => setSelectedClinicId(id)}
-                        height="700px"
-                      />
-                    </div>
 
-                    {/* Xarita ostidagi klinikalar ro'yxati */}
-                    <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs">
-                      <div className="flex items-center justify-between mb-2 px-1">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Xaritadagi tasdiqlangan klinikalar ({clinics.length}):
-                        </span>
+                  {/* Xarita ostidagi tezkor klinika tanlash tugmalari */}
+                  <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        Xaritadagi tasdiqlangan klinikalar ({clinics.length}):
+                      </span>
+                      {selectedClinic ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedClinicId(null)}
+                          className="text-[11px] text-brand-blue hover:underline font-semibold"
+                        >
+                          Xaritani to‘liq ochish
+                        </button>
+                      ) : (
                         <span className="text-[11px] text-slate-400">
-                          Klinikani bosib uning ma’lumotlarini o‘ngda ochishingiz mumkin
+                          Klinikani bosib xaritada fokuslash va ma’lumotlarini ochish mumkin
                         </span>
-                      </div>
-                      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                        {clinics.map((c) => (
+                      )}
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                      {clinics.map((c) => {
+                        const isSel = selectedClinic?.id === c.id;
+                        return (
                           <button
                             key={c.id}
                             type="button"
                             onClick={() => setSelectedClinicId(c.id)}
-                            className="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white hover:border-brand-blue hover:text-brand-blue transition-all"
+                            className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                              isSel
+                                ? 'bg-brand-navy text-white border-brand-navy shadow-xs ring-2 ring-brand-blue/30 scale-102'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white hover:border-brand-blue hover:text-brand-blue'
+                            }`}
                           >
                             <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
                             <span className="truncate max-w-[150px]">{c.name}</span>
                             {c.region && (
-                              <span className="text-[10px] text-slate-400">({c.region})</span>
+                              <span
+                                className={`text-[10px] ${isSel ? 'text-slate-300' : 'text-slate-400'}`}
+                              >
+                                ({c.region})
+                              </span>
                             )}
                           </button>
-                        ))}
-                      </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* O'ng ustun (Desktopda): Tanlangan klinikaning to'liq ma'lumot kartasi */}
+                {selectedClinic && (
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24">
+                    <ClinicMapDetailCard
+                      clinic={selectedClinic}
+                      onClose={() => setSelectedClinicId(null)}
+                    />
+                  </div>
+                )}
+
+                {/* Mobilda: Pastdan chiquvchi modal (Bottom Sheet Drawer) */}
+                {selectedClinic && (
+                  <div className="lg:hidden fixed inset-x-0 bottom-0 z-50 p-3 max-h-[85vh] overflow-y-auto bg-black/40 backdrop-blur-xs flex flex-col justify-end">
+                    <div className="max-w-md mx-auto w-full">
+                      <ClinicMapDetailCard
+                        clinic={selectedClinic}
+                        onClose={() => setSelectedClinicId(null)}
+                      />
                     </div>
                   </div>
                 )}

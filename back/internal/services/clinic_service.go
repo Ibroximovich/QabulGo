@@ -120,6 +120,13 @@ func (s *clinicService) CreateClinic(ctx context.Context, ownerID uuid.UUID, req
 		}
 		lat = req.Latitude
 		lon = req.Longitude
+	} else if strings.TrimSpace(req.LocationURL) != "" {
+		// Agar koordinatalar berilmagan bo'lsa, xarita havolasidan avtomatik ajratib olish
+		cLat, cLon := utils.ExtractCoordinatesFromURL(req.LocationURL)
+		if cLat != nil && cLon != nil {
+			lat = cLat
+			lon = cLon
+		}
 	}
 
 	clinic := &models.Clinic{
@@ -247,6 +254,13 @@ func (s *clinicService) UpdateClinic(ctx context.Context, clinicID, userID uuid.
 		}
 		clinic.Latitude = req.Latitude
 		clinic.Longitude = req.Longitude
+	} else if clinic.Latitude == nil && clinic.LocationURL != "" {
+		// Agar koordinata hali ham mavjud bo'lmasa, xarita havolasidan ajratib olish
+		cLat, cLon := utils.ExtractCoordinatesFromURL(clinic.LocationURL)
+		if cLat != nil && cLon != nil {
+			clinic.Latitude = cLat
+			clinic.Longitude = cLon
+		}
 	}
 	if req.LogoURL != nil {
 		clinic.LogoURL = *req.LogoURL

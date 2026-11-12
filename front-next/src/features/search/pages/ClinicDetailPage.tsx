@@ -149,9 +149,6 @@ export function ClinicDetailPage({ initialClinic, initialDoctors }: ClinicDetail
     if (fromUrl) {
       effectiveLat = fromUrl.latitude;
       effectiveLon = fromUrl.longitude;
-    } else if (clinic.region && REGION_DEFAULT_COORDINATES[clinic.region]) {
-      effectiveLat = REGION_DEFAULT_COORDINATES[clinic.region].latitude;
-      effectiveLon = REGION_DEFAULT_COORDINATES[clinic.region].longitude;
     }
   }
 

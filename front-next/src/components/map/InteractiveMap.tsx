@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import 'leaflet/dist/leaflet.css';
-import { Building2, Navigation, MapPin } from 'lucide-react';
-import { extractCoordinatesFromUrl, REGION_DEFAULT_COORDINATES } from '@/lib/utils/location';
+import { MapPin } from 'lucide-react';
+import { extractCoordinatesFromUrl } from '@/lib/utils/location';
 import { PublicClinicItem, NearbyClinicItem } from '@/features/search/types';
 
 export interface MapClinicItem {
@@ -13,8 +13,9 @@ export interface MapClinicItem {
   address: string;
   region?: string;
   district?: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_url?: string;
   distance_km?: number;
   phone?: string;
   logo_url?: string;
@@ -38,6 +39,13 @@ export interface InteractiveMapProps {
 // O'zbekiston / Toshkent markazi (default)
 const DEFAULT_CENTER: [number, number] = [41.311081, 69.240562];
 
+interface MarkerEntry {
+  marker: any;
+  clinic: any;
+  lat: number;
+  lng: number;
+}
+
 export function InteractiveMap({
   clinics = [],
   userLocation = null,
@@ -53,16 +61,15 @@ export function InteractiveMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersLayerRef = useRef<any>(null);
-  const userMarkerRef = useRef<any>(null);
-  const pickerMarkerRef = useRef<any>(null);
+  const markersMapRef = useRef<Map<string, MarkerEntry>>(new Map());
   const [isMounted, setIsMounted] = useState(false);
-  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Initialize Map
+  // 1. Initialize Leaflet Map
   useEffect(() => {
     if (!isMounted || !mapContainerRef.current) return;
 
@@ -86,7 +93,11 @@ export function InteractiveMap({
       } else if (userLocation) {
         initialCenter = [userLocation.latitude, userLocation.longitude];
       } else if (clinics.length > 0) {
-        const firstWithCoords = clinics.find((c) => c.latitude && c.longitude);
+        const firstWithCoords = clinics.find((c) => {
+          const lat = typeof c.latitude === 'number' && !isNaN(c.latitude) && c.latitude !== 0;
+          const lon = typeof c.longitude === 'number' && !isNaN(c.longitude) && c.longitude !== 0;
+          return lat && lon;
+        });
         if (firstWithCoords?.latitude && firstWithCoords?.longitude) {
           initialCenter = [firstWithCoords.latitude, firstWithCoords.longitude];
         }
@@ -108,7 +119,7 @@ export function InteractiveMap({
 
       mapInstanceRef.current = map;
       markersLayerRef.current = L.layerGroup().addTo(map);
-      setMapInstance(map);
+      setMapReady(true);
 
       // Picker mode click handler
       if (pickerMode) {
@@ -124,7 +135,7 @@ export function InteractiveMap({
 
     initMap();
 
-    // Map container o'lchami o'zgarganda (masalan, yon panel ochilganda/yopilganda) xaritani moslash
+    // Map container o'lchami o'zgarganda xaritani moslash
     let resizeObserver: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
       resizeObserver = new ResizeObserver(() => {
@@ -144,38 +155,107 @@ export function InteractiveMap({
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
+      setMapReady(false);
     };
   }, [isMounted]);
 
-  // Update Markers (Clinics, User, Picker)
+  // Helper: Icon yaratish
+  const createClinicIcon = useCallback((L: any, clinicName: string, isSelected: boolean) => {
+    const redPinSvg = isSelected
+      ? `<svg width="38" height="48" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 8px rgba(220,38,38,0.55));">
+           <path d="M17 0C7.611 0 0 7.611 0 17C0 29.75 15.3 43.15 15.95 43.71C16.25 43.97 16.62 44.1 17 44.1C17.38 44.1 17.75 43.97 18.05 43.71C18.7 43.15 34 29.75 34 17C34 7.611 26.389 0 17 0Z" fill="#DC2626" stroke="#FFFFFF" stroke-width="2.5"/>
+           <circle cx="17" cy="16" r="6.5" fill="#FFFFFF"/>
+         </svg>`
+      : `<svg width="32" height="42" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 4px rgba(0,0,0,0.35));">
+           <path d="M17 0C7.611 0 0 7.611 0 17C0 29.75 15.3 43.15 15.95 43.71C16.25 43.97 16.62 44.1 17 44.1C17.38 44.1 17.75 43.97 18.05 43.71C18.7 43.15 34 29.75 34 17C34 7.611 26.389 0 17 0Z" fill="#EA4335" stroke="#B91C1C" stroke-width="1.2"/>
+           <circle cx="17" cy="16" r="5.5" fill="#FFFFFF"/>
+         </svg>`;
+
+    return L.divIcon({
+      className: 'qabulgo-red-pin',
+      html: `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transform: ${
+          isSelected ? 'scale(1.22)' : 'scale(1)'
+        }; transition: transform 0.2s ease;">
+          ${redPinSvg}
+          <div style="width: 14px; height: 5px; background: rgba(0,0,0,0.25); border-radius: 50%; filter: blur(1px); margin-top: -2px;"></div>
+          ${
+            isSelected
+              ? `<div style="position: absolute; top: -30px; background: #08234A; color: white; font-size: 11px; font-weight: bold; padding: 3px 9px; border-radius: 8px; white-space: nowrap; box-shadow: 0 4px 8px rgba(0,0,0,0.35); pointer-events: none; border: 1px solid rgba(255,255,255,0.2);">${clinicName}</div>`
+              : ''
+          }
+        </div>
+      `,
+      iconSize: isSelected ? [38, 48] : [32, 42],
+      iconAnchor: isSelected ? [19, 48] : [16, 42],
+      popupAnchor: isSelected ? [0, -48] : [0, -42],
+    });
+  }, []);
+
+  // Helper: Popup kontentini yaratish
+  const createPopupContent = useCallback((clinic: any) => {
+    const distanceStr =
+      'distance_km' in clinic && typeof clinic.distance_km === 'number'
+        ? `<div class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-teal bg-teal-50 px-2 py-0.5 rounded-md border border-teal-100 my-1">
+             <span>📍 ${clinic.distance_km.toFixed(1)} km masofada</span>
+           </div>`
+        : '';
+
+    const phoneStr = clinic.phone
+      ? `<div class="mt-1.5 flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+           <span>📞</span>
+           <a href="tel:${clinic.phone}" class="text-brand-blue hover:underline font-semibold">${clinic.phone}</a>
+         </div>`
+      : '';
+
+    return `
+      <div class="p-2.5 font-sans min-w-[210px] max-w-[250px]">
+        <h4 class="font-bold text-sm text-brand-navy leading-snug line-clamp-1">${clinic.name}</h4>
+        <p class="text-xs text-slate-500 mt-1 line-clamp-2">${clinic.address || clinic.district || clinic.region || ''}</p>
+        ${distanceStr}
+        ${phoneStr}
+        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+          <a href="/clinics/${clinic.id}" class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-blue text-white hover:bg-brand-blue-600 transition-colors shadow-xs w-full text-center">
+            Klinikani ko‘rish &rarr;
+          </a>
+        </div>
+      </div>
+    `;
+  }, []);
+
+  // 2. Render Markers Layer (Only rebuilds when clinics list or user/picker location changes)
   useEffect(() => {
-    if (!mapInstance || !markersLayerRef.current) return;
+    if (!mapReady || !mapInstanceRef.current || !markersLayerRef.current) return;
 
     let isCancelled = false;
 
-    async function renderLayers() {
+    async function buildLayers() {
       const L = await import('leaflet');
-      if (isCancelled || !mapInstance || !markersLayerRef.current) return;
+      if (isCancelled || !mapInstanceRef.current || !markersLayerRef.current) return;
 
-      const map = mapInstance;
+      const map = mapInstanceRef.current;
       const markersLayer = markersLayerRef.current;
       markersLayer.clearLayers();
+      markersMapRef.current.clear();
 
-      // Barcha tasdiqlangan klinikalarni koordinatalar bilan ta'minlash (agar aniq koordinata bo'lmasa, URL yoki viloyat koordinatasi)
+      // Haqiqiy koordinataga ega klinikalarni saralash (Termiz fallback yo'q!)
       const validClinicsWithCoords = clinics
         .map((c) => {
-          let lat = typeof c.latitude === 'number' && !isNaN(c.latitude) ? c.latitude : null;
-          let lon = typeof c.longitude === 'number' && !isNaN(c.longitude) ? c.longitude : null;
+          let lat =
+            typeof c.latitude === 'number' && !isNaN(c.latitude) && c.latitude !== 0 ? c.latitude : null;
+          let lon =
+            typeof c.longitude === 'number' && !isNaN(c.longitude) && c.longitude !== 0 ? c.longitude : null;
 
           if (lat === null || lon === null) {
             const parsed = extractCoordinatesFromUrl((c as any).location_url);
             if (parsed) {
               lat = parsed.latitude;
               lon = parsed.longitude;
-            } else if (c.region && REGION_DEFAULT_COORDINATES[c.region]) {
-              lat = REGION_DEFAULT_COORDINATES[c.region].latitude;
-              lon = REGION_DEFAULT_COORDINATES[c.region].longitude;
             }
+          }
+
+          if (lat === null || lon === null) {
+            return null;
           }
 
           return {
@@ -184,14 +264,54 @@ export function InteractiveMap({
             longitude: lon,
           };
         })
-        .filter(
-          (c): c is typeof c & { latitude: number; longitude: number } =>
-            typeof c.latitude === 'number' && typeof c.longitude === 'number' && !isNaN(c.latitude) && !isNaN(c.longitude)
-        );
+        .filter((c): c is (typeof clinics[0] & { latitude: number; longitude: number }) => c !== null);
+
+      // Spiderfy / Bir xil koordinatadagi klinikalarni tarqatish
+      // Bir-biriga o'ta yaqin (< ~25 metr) bo'lgan klinikalarni guruhlash
+      const coordGroups = new Map<string, typeof validClinicsWithCoords>();
+      validClinicsWithCoords.forEach((clinic) => {
+        const key = `${clinic.latitude.toFixed(4)}_${clinic.longitude.toFixed(4)}`;
+        if (!coordGroups.has(key)) {
+          coordGroups.set(key, []);
+        }
+        coordGroups.get(key)!.push(clinic);
+      });
+
+      interface PositionedItem {
+        clinic: typeof validClinicsWithCoords[0];
+        lat: number;
+        lng: number;
+      }
+
+      const positionedItems: PositionedItem[] = [];
+      coordGroups.forEach((group) => {
+        const count = group.length;
+        if (count === 1) {
+          positionedItems.push({
+            clinic: group[0],
+            lat: group[0].latitude,
+            lng: group[0].longitude,
+          });
+        } else {
+          // Aylana bo'ylab tarqatish (spiderfy offset)
+          const radius = 0.00028; // ~30 metr
+          group.forEach((clinic, idx) => {
+            const angle = (2 * Math.PI / count) * idx;
+            const offsetLat = clinic.latitude + radius * Math.cos(angle);
+            const offsetLng =
+              clinic.longitude + (radius * Math.sin(angle)) / Math.cos((clinic.latitude * Math.PI) / 180);
+            positionedItems.push({
+              clinic,
+              lat: offsetLat,
+              lng: offsetLng,
+            });
+          });
+        }
+      });
 
       const bounds = L.latLngBounds([]);
 
-      // 1. Foydalanuvchi joylashuvi marker (ko'k pulsatsiya)
+      // 1. Foydalanuvchi joylashuvi marker
       if (userLocation && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number') {
         const userIcon = L.divIcon({
           className: 'custom-user-marker',
@@ -219,7 +339,7 @@ export function InteractiveMap({
         bounds.extend([userLocation.latitude, userLocation.longitude]);
       }
 
-      // 2. Picker rejimi (Klinika administratori tanlagan nuqta)
+      // 2. Picker rejimi
       if (pickerMode && pickedLocation) {
         const pickerIcon = L.divIcon({
           className: 'custom-picker-marker',
@@ -261,106 +381,88 @@ export function InteractiveMap({
       }
 
       // 3. Klinikalar markerlari
-      validClinicsWithCoords.forEach((clinic) => {
+      positionedItems.forEach(({ clinic, lat, lng }) => {
         const isSelected = selectedClinicId === clinic.id;
-        const distanceStr =
-          'distance_km' in clinic && typeof (clinic as any).distance_km === 'number'
-            ? `<div class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-teal bg-teal-50 px-2 py-0.5 rounded-md border border-teal-100 my-1">
-                 <span>📍 ${(clinic as any).distance_km.toFixed(1)} km masofada</span>
-               </div>`
-            : '';
+        const icon = createClinicIcon(L, clinic.name, isSelected);
 
-        const redPinSvg = isSelected
-          ? `<svg width="38" height="48" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.45));">
-               <path d="M17 0C7.611 0 0 7.611 0 17C0 29.75 15.3 43.15 15.95 43.71C16.25 43.97 16.62 44.1 17 44.1C17.38 44.1 17.75 43.97 18.05 43.71C18.7 43.15 34 29.75 34 17C34 7.611 26.389 0 17 0Z" fill="#DC2626" stroke="#FFFFFF" stroke-width="2.5"/>
-               <circle cx="17" cy="16" r="6.5" fill="#FFFFFF"/>
-             </svg>`
-          : `<svg width="32" height="42" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 4px rgba(0,0,0,0.35));">
-               <path d="M17 0C7.611 0 0 7.611 0 17C0 29.75 15.3 43.15 15.95 43.71C16.25 43.97 16.62 44.1 17 44.1C17.38 44.1 17.75 43.97 18.05 43.71C18.7 43.15 34 29.75 34 17C34 7.611 26.389 0 17 0Z" fill="#EA4335" stroke="#B91C1C" stroke-width="1.2"/>
-               <circle cx="17" cy="16" r="5.5" fill="#FFFFFF"/>
-             </svg>`;
-
-        const clinicIcon = L.divIcon({
-          className: 'qabulgo-red-pin',
-          html: `
-            <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transform: ${
-              isSelected ? 'scale(1.2)' : 'scale(1)'
-            }; transition: transform 0.2s;">
-              ${redPinSvg}
-              <div style="width: 14px; height: 5px; background: rgba(0,0,0,0.25); border-radius: 50%; filter: blur(1px); margin-top: -2px;"></div>
-              ${
-                isSelected
-                  ? `<div style="position: absolute; top: -28px; background: #08234A; color: white; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 6px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.25); pointer-events: none;">${clinic.name}</div>`
-                  : ''
-              }
-            </div>
-          `,
-          iconSize: isSelected ? [38, 48] : [32, 42],
-          iconAnchor: isSelected ? [19, 48] : [16, 42],
-          popupAnchor: isSelected ? [0, -48] : [0, -42],
-        });
-
-        const marker = L.marker([clinic.latitude, clinic.longitude], {
-          icon: clinicIcon,
+        const marker = L.marker([lat, lng], {
+          icon,
           title: clinic.name,
+          zIndexOffset: isSelected ? 1000 : 0,
         });
 
-        const popupContent = `
-          <div class="p-2 font-sans max-w-[240px]">
-            <h4 class="font-bold text-sm text-brand-navy leading-snug line-clamp-1">${clinic.name}</h4>
-            <p class="text-xs text-slate-500 mt-1 line-clamp-2">${clinic.address || clinic.district || clinic.region}</p>
-            ${distanceStr}
-            <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-              <button type="button" class="inline-flex items-center justify-center px-3 py-1 text-xs font-semibold rounded-lg bg-brand-blue text-white hover:bg-brand-blue-600 transition-colors">
-                Tanlash
-              </button>
-              ${
-                clinic.phone
-                  ? `<span class="text-xs font-medium text-slate-600">
-                       ${clinic.phone}
-                     </span>`
-                  : ''
-              }
-            </div>
-          </div>
-        `;
-
+        const popupContent = createPopupContent(clinic);
         marker.bindPopup(popupContent);
 
         marker.on('click', () => {
           if (onSelectClinic) {
             onSelectClinic(clinic.id);
           }
-          map.panTo([clinic.latitude, clinic.longitude], { animate: true, duration: 0.5 });
+          map.panTo([lat, lng], { animate: true, duration: 0.5 });
         });
 
         markersLayer.addLayer(marker);
-        bounds.extend([clinic.latitude, clinic.longitude]);
+        markersMapRef.current.set(clinic.id, { marker, clinic, lat, lng });
+        bounds.extend([lat, lng]);
 
         if (isSelected) {
           marker.openPopup();
         }
       });
 
-      // Fit bounds if we have valid coordinates and not single-point zoom
-      if (bounds.isValid() && validClinicsWithCoords.length > 1) {
+      // Sahifa yuklanganda / natijalar o'zgarganda fitBounds
+      if (bounds.isValid() && positionedItems.length > 1) {
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-      } else if (validClinicsWithCoords.length === 1) {
-        map.setView([validClinicsWithCoords[0].latitude, validClinicsWithCoords[0].longitude], 14);
+      } else if (positionedItems.length === 1) {
+        map.setView([positionedItems[0].lat, positionedItems[0].lng], 14);
       }
     }
 
-    renderLayers();
+    buildLayers();
 
     return () => {
       isCancelled = true;
     };
-  }, [mapInstance, clinics, userLocation, pickedLocation, selectedClinicId, pickerMode]);
+  }, [mapReady, clinics, userLocation, pickedLocation, pickerMode, createClinicIcon, createPopupContent, onSelectClinic, onLocationPick]);
+
+  // 3. Handle selectedClinicId changes (pans, highlights marker, opens popup WITHOUT resetting layers)
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current) return;
+
+    let isCancelled = false;
+
+    async function updateSelection() {
+      const L = await import('leaflet');
+      if (isCancelled || !mapInstanceRef.current) return;
+
+      const map = mapInstanceRef.current;
+      const markersMap = markersMapRef.current;
+
+      markersMap.forEach((entry, clinicId) => {
+        const isSelected = selectedClinicId === clinicId;
+        const icon = createClinicIcon(L, entry.clinic.name, isSelected);
+        entry.marker.setIcon(icon);
+        entry.marker.setZIndexOffset(isSelected ? 1000 : 0);
+
+        if (isSelected) {
+          entry.marker.openPopup();
+          // Xaritani tanlangan klinikaga markazlashtirish
+          map.panTo([entry.lat, entry.lng], { animate: true, duration: 0.5 });
+        }
+      });
+    }
+
+    updateSelection();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedClinicId, mapReady, createClinicIcon]);
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200/80 shadow-subtle bg-slate-100">
       <div ref={mapContainerRef} style={{ height, width: '100%' }} className="z-0" />
-      
+
       {/* Attribution badge overlay */}
       <div className="absolute bottom-2 left-2 z-10 pointer-events-none">
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 backdrop-blur-sm text-[11px] font-medium text-slate-600 border border-slate-200/60 shadow-xs">
@@ -371,4 +473,3 @@ export function InteractiveMap({
     </div>
   );
 }
-
