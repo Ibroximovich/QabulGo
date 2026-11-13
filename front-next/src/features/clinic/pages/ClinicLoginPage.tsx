@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
@@ -17,9 +17,15 @@ import { useAuth } from '@/providers/AuthProvider';
 
 export function ClinicLoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, isAuthenticated, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && (user?.role === 'clinic_owner' || user?.role === 'clinic_admin')) {
+      router.replace('/clinic/dashboard');
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   const {
     register,

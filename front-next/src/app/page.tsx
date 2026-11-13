@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { HomeRoleRedirect } from '@/components/auth/HomeRoleRedirect';
 
 export const metadata: Metadata = {
   title: 'QabulGo — Shifokor va klinikalarga onlayn qabul | Termiz va O‘zbekiston',
@@ -42,7 +43,14 @@ const POPULAR_SEARCHES = [
 
 export default function RootPage() {
   return (
-    <AppLayout>
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{var u=localStorage.getItem("qabulgo_user");var t=localStorage.getItem("qabulgo_access_token");if(u&&t){var p=JSON.parse(u);if(p&&p.role){if(p.role==="clinic_owner"||p.role==="clinic_admin"){window.location.replace("/clinic/dashboard");}else if(p.role==="doctor"){window.location.replace("/doctor/dashboard");}else if(p.role==="super_admin"){window.location.replace("/admin/clinics");}}}}catch(e){}})();`,
+        }}
+      />
+      <HomeRoleRedirect />
+      <AppLayout>
       <div className="space-y-16 py-6 sm:py-10">
         {/* Hero Section */}
         <div className="relative rounded-3xl gradient-primary p-8 sm:p-14 text-white overflow-hidden shadow-elevated">
@@ -154,5 +162,6 @@ export default function RootPage() {
         </div>
       </div>
     </AppLayout>
+    </>
   );
 }

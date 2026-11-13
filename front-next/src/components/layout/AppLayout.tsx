@@ -148,7 +148,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex h-18 items-center justify-between gap-4">
             {/* Logo */}
             <div className="flex items-center gap-8">
-              <BrandLogo size="md" href="/dashboard" />
+              <BrandLogo size="md" href={user ? roleInfo.href : '/'} />
 
               {/* Desktop Navigation Links */}
               <nav className="hidden md:flex items-center gap-1.5" aria-label="Asosiy navigatsiya">

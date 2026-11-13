@@ -2,7 +2,7 @@
 
 import { useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail, Lock } from 'lucide-react';
@@ -13,12 +13,29 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { loginSchema, LoginFormValues } from '../schemas/authSchemas';
 import { useLogin } from '../hooks/useLogin';
+import { useAuth } from '@/providers/AuthProvider';
 
 function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const isVerified = searchParams?.get('verified') === 'true';
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   const { mutate: loginUser, isPending } = useLogin();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user?.role) {
+      if (user.role === 'clinic_owner' || user.role === 'clinic_admin') {
+        router.replace('/clinic/dashboard');
+      } else if (user.role === 'doctor') {
+        router.replace('/doctor/dashboard');
+      } else if (user.role === 'super_admin') {
+        router.replace('/admin/clinics');
+      } else {
+        router.replace('/dashboard');
+      }
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   const {
     register,

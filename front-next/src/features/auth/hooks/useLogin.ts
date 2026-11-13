@@ -20,7 +20,16 @@ export function useLogin() {
         login(response.data.access_token, response.data.user);
         toast.success(response.message || 'Muvaffaqiyatli tizimga kirdingiz');
 
-        const from = searchParams.get('from') || '/dashboard';
+        const role = response.data.user.role;
+        const defaultDestination =
+          role === 'clinic_owner' || role === 'clinic_admin'
+            ? '/clinic/dashboard'
+            : role === 'doctor'
+            ? '/doctor/dashboard'
+            : role === 'super_admin'
+            ? '/admin/clinics'
+            : '/dashboard';
+        const from = searchParams.get('from') || defaultDestination;
         router.replace(from);
       }
     },
