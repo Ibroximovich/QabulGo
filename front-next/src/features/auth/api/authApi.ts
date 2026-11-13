@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api/client';
-import { ApiResponse, LoginData, RefreshTokenResponse } from '@/types/api';
+import { ApiResponse, LoginData, RefreshTokenResponse, UserSummary } from '@/types/api';
 import {
   RegisterRequestPayload,
   RegisterResponseData,
@@ -72,6 +72,11 @@ export const authApi = {
       '/auth/reset-password',
       payload
     );
+    return response.data;
+  },
+
+  async getMe(): Promise<ApiResponse<UserSummary>> {
+    const response = await apiClient.get<ApiResponse<UserSummary>>('/auth/me');
     return response.data;
   },
 };

@@ -5,7 +5,6 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { UserSummary } from '@/types/api';
 import { authApi } from '@/features/auth/api/authApi';
-import { patientApi } from '@/features/patient/api/patientApi';
 import { tokenStorage } from '@/lib/api/tokenStorage';
 import { queryClient } from './QueryProvider';
 
@@ -42,17 +41,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserSummary | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
-      // 1. Check sessionStorage for super admin active in current session
+      // 1. Check active super admin in sessionStorage
       const sessionCached = sessionStorage.getItem('qabulgo_user');
       if (sessionCached) {
         const parsed = JSON.parse(sessionCached);
         if (parsed.role === 'super_admin') return parsed;
       }
-      // 2. Check localStorage for persistent 30-day users
+
+      // 2. Check localStorage for persistent users (patient, clinic, doctor)
       const localCached = localStorage.getItem('qabulgo_user');
       if (localCached) {
         const parsed = JSON.parse(localCached);
-        if (parsed.role !== 'super_admin') return parsed;
+        if (parsed.role !== 'super_admin') {
+          // If token exists, make sure role strictly reflects the signed JWT claims
+          const token = tokenStorage.getAccessToken();
+          if (token) {
+            const claims = parseJwtRoleAndId(token);
+            if (claims?.role) {
+              parsed.role = claims.role;
+            }
+          }
+          return parsed;
+        }
       }
       return null;
     } catch {
@@ -128,28 +138,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refetchUser = useCallback(async () => {
-    if (!user || user.role === 'patient') {
-      try {
-        const res = await patientApi.getProfile();
-        if (res.data) {
-          const freshUser: UserSummary = {
-            id: res.data.id,
-            first_name: res.data.first_name,
-            last_name: res.data.last_name,
-            email: res.data.email,
-            phone: res.data.phone,
-            role: res.data.role,
-          };
-          setUser(freshUser);
-          if (typeof window !== 'undefined') {
+    try {
+      const res = await authApi.getMe();
+      if (res.data) {
+        const freshUser: UserSummary = {
+          id: res.data.id,
+          first_name: res.data.first_name,
+          last_name: res.data.last_name,
+          email: res.data.email,
+          phone: res.data.phone,
+          role: res.data.role,
+        };
+        setUser(freshUser);
+        if (typeof window !== 'undefined') {
+          if (freshUser.role === 'super_admin') {
+            sessionStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
+          } else {
             localStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
           }
         }
-      } catch (err) {
-        console.error('Failed to refetch patient profile', err);
       }
+    } catch (err) {
+      console.error('Failed to refetch user profile', err);
     }
-  }, [user]);
+  }, []);
 
   // Initial Auth Check / Silent Refresh
   useEffect(() => {
@@ -168,6 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
               const sessionUser = JSON.parse(sessionUserStr);
               if (sessionUser.id === claims.user_id) {
+                if (claims.role) {
+                  sessionUser.role = claims.role;
+                }
                 if (isMounted) {
                   setUser(sessionUser);
                   setIsAuthenticated(true);
@@ -184,20 +199,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
               const localUser = JSON.parse(localUserStr);
               if (localUser.id === claims.user_id) {
+                // Ground truth: strictly preserve role from signed token
+                if (claims.role) {
+                  localUser.role = claims.role;
+                }
                 if (isMounted) {
                   setUser(localUser);
                   setIsAuthenticated(true);
                   setIsLoading(false);
                 }
 
-                // Silently refresh in background to keep tokens fresh
-                authApi.refreshToken().then((res) => {
-                  const refreshedToken = res.data?.access_token;
-                  if (refreshedToken && isMounted) {
-                    tokenStorage.setAccessToken(refreshedToken, localUser.role);
+                // Verify fresh profile with backend in background via GET /api/v1/auth/me
+                authApi.getMe().then((res) => {
+                  if (res.data && isMounted) {
+                    const freshUser = res.data;
+                    setUser(freshUser);
+                    localStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
                   }
                 }).catch(() => {
-                  // If refresh fails due to network/offline, keep session active since token is valid for 30 days
+                  // Silent refresh fallback if needed
+                  authApi.refreshToken().then((refreshRes) => {
+                    const refreshedToken = refreshRes.data?.access_token;
+                    if (refreshedToken && isMounted) {
+                      const refreshedUser = refreshRes.data?.user || localUser;
+                      tokenStorage.setAccessToken(refreshedToken, refreshedUser.role);
+                      setUser(refreshedUser);
+                      localStorage.setItem('qabulgo_user', JSON.stringify(refreshedUser));
+                    }
+                  }).catch(() => {});
                 });
                 return;
               }
@@ -213,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (newToken && isMounted) {
           const newClaims = parseJwtRoleAndId(newToken);
-          const role = newClaims?.role;
+          const role = res.data?.user?.role || newClaims?.role;
 
           // If role is super_admin and this is a fresh browser opening without session token, do NOT auto-login!
           if (role === 'super_admin' && !sessionStorage.getItem('qabulgo_admin_access_token')) {
@@ -225,35 +254,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           tokenStorage.setAccessToken(newToken, role);
 
-          if (role === 'patient') {
-            try {
-              const profileRes = await patientApi.getProfile();
-              if (profileRes.data && isMounted) {
-                const freshUser: UserSummary = {
-                  id: profileRes.data.id,
-                  first_name: profileRes.data.first_name,
-                  last_name: profileRes.data.last_name,
-                  email: profileRes.data.email,
-                  phone: profileRes.data.phone,
-                  role: profileRes.data.role,
-                };
-                setUser(freshUser);
-                setIsAuthenticated(true);
-                localStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
-                return;
-              }
-            } catch {
-              // Fallback to cached
+          // If refreshToken returned user directly:
+          if (res.data?.user) {
+            const freshUser = res.data.user;
+            setUser(freshUser);
+            setIsAuthenticated(true);
+            if (role === 'super_admin') {
+              sessionStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
+            } else {
+              localStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
             }
+            return;
           }
 
-          // For clinic owners, clinic admins, doctors, or superadmin
+          // Otherwise fetch via authApi.getMe()
+          try {
+            const meRes = await authApi.getMe();
+            if (meRes.data && isMounted) {
+              const freshUser = meRes.data;
+              setUser(freshUser);
+              setIsAuthenticated(true);
+              if (role === 'super_admin') {
+                sessionStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
+              } else {
+                localStorage.setItem('qabulgo_user', JSON.stringify(freshUser));
+              }
+              return;
+            }
+          } catch {}
+
+          // Fallback to cached storage
           const storage = role === 'super_admin' ? sessionStorage : localStorage;
           const cachedStr = typeof window !== 'undefined' ? storage.getItem('qabulgo_user') : null;
           if (cachedStr) {
             try {
               const cached = JSON.parse(cachedStr);
               if (newClaims?.user_id && cached.id === newClaims.user_id) {
+                if (role) cached.role = role;
                 setUser(cached);
                 setIsAuthenticated(true);
                 return;
@@ -271,7 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               last_name: '',
               email: '',
               phone: '',
-              role: newClaims.role || 'user',
+              role: role || 'patient',
             };
             setUser(fallbackUser);
             setIsAuthenticated(true);

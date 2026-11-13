@@ -41,12 +41,55 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
+  const getRoleInfo = () => {
+    switch (user?.role) {
+      case 'clinic_owner':
+        return {
+          label: 'Klinika egasi',
+          badgeClass: 'text-brand-blue bg-blue-50 border-blue-200',
+          href: '/clinic/dashboard',
+          defaultName: 'Klinika',
+        };
+      case 'clinic_admin':
+        return {
+          label: 'Klinika admini',
+          badgeClass: 'text-brand-blue bg-blue-50 border-blue-200',
+          href: '/clinic/dashboard',
+          defaultName: 'Klinika',
+        };
+      case 'doctor':
+        return {
+          label: 'Shifokor',
+          badgeClass: 'text-purple-700 bg-purple-50 border-purple-200',
+          href: '/doctor/dashboard',
+          defaultName: 'Shifokor',
+        };
+      case 'super_admin':
+        return {
+          label: 'Super Admin',
+          badgeClass: 'text-amber-800 bg-amber-50 border-amber-200',
+          href: '/admin/clinics',
+          defaultName: 'Administrator',
+        };
+      case 'patient':
+      default:
+        return {
+          label: 'Bemor akkaunti',
+          badgeClass: 'text-emerald-700 bg-emerald-50 border-emerald-100',
+          href: '/dashboard',
+          defaultName: 'Bemor',
+        };
+    }
+  };
+
+  const roleInfo = getRoleInfo();
+
   const navItems: NavItem[] = [
     ...(user
       ? [
           {
             name: 'Kabinet',
-            href: '/dashboard',
+            href: roleInfo.href,
             icon: LayoutDashboard,
             isAvailable: true,
           },
@@ -92,7 +135,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   };
 
   const userInitials = getInitials(user?.first_name, user?.last_name);
-  const userFullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Bemor';
+  const userFullName =
+    `${user?.first_name || ''} ${user?.last_name || ''}`.trim() ||
+    user?.email ||
+    roleInfo.defaultName;
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-bg">
@@ -182,20 +228,30 @@ export function AppLayout({ children }: AppLayoutProps) {
                         <div className="px-4 py-2.5 border-b border-slate-100">
                           <p className="text-xs font-semibold text-brand-navy">{userFullName}</p>
                           <p className="text-xs text-brand-muted truncate">{user?.email}</p>
-                          <span className="inline-block mt-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                            Bemor akkaunti
+                          <span className={cn('inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full border', roleInfo.badgeClass)}>
+                            {roleInfo.label}
                           </span>
                         </div>
 
                         <div className="py-1">
                           <Link
-                            href="/profile"
+                            href={roleInfo.href}
                             onClick={() => setIsProfileMenuOpen(false)}
                             className="flex items-center gap-2.5 px-4 py-2 text-sm text-brand-navy hover:bg-slate-50 transition-colors"
                           >
-                            <User className="h-4 w-4 text-brand-muted" />
-                            <span>Profil ma’lumotlari</span>
+                            <LayoutDashboard className="h-4 w-4 text-brand-muted" />
+                            <span>Kabinetga o‘tish</span>
                           </Link>
+                          {user?.role === 'patient' && (
+                            <Link
+                              href="/profile"
+                              onClick={() => setIsProfileMenuOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2 text-sm text-brand-navy hover:bg-slate-50 transition-colors"
+                            >
+                              <User className="h-4 w-4 text-brand-muted" />
+                              <span>Profil ma’lumotlari</span>
+                            </Link>
+                          )}
                         </div>
 
                         <div className="pt-1 border-t border-slate-100">
@@ -254,6 +310,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <div className="overflow-hidden">
                   <p className="text-sm font-bold text-brand-navy truncate">{userFullName}</p>
                   <p className="text-xs text-brand-muted truncate">{user?.email}</p>
+                  <span className={cn('inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full border', roleInfo.badgeClass)}>
+                    {roleInfo.label}
+                  </span>
                 </div>
               </div>
             ) : (

@@ -7,8 +7,10 @@ import (
 
 	"qabulgo-backend/internal/config"
 	"qabulgo-backend/internal/dto"
+	"qabulgo-backend/internal/middleware"
 	"qabulgo-backend/internal/repositories"
 	"qabulgo-backend/internal/services"
+	"qabulgo-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -393,11 +395,42 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	// Yangi refresh token cookie
 	h.setRefreshTokenCookie(c, newRefreshToken, expiresAt)
 
-	c.JSON(http.StatusOK, dto.NewSuccessResponse("Token muvaffaqiyatli yangilandi", gin.H{
+	responseData := gin.H{
 		"access_token": newAccessToken,
 		"token_type":   "Bearer",
 		"expires_in":   int64(h.cfg.AccessTokenTTL.Seconds()),
-	}))
+	}
+
+	claims, err := utils.ValidateAccessToken(newAccessToken, h.cfg.JWTSecret, h.cfg.JWTIssuer, h.cfg.JWTAudience)
+	if err == nil && claims != nil {
+		if userSummary, err := h.authService.GetMe(c.Request.Context(), claims.UserID); err == nil && userSummary != nil {
+			responseData["user"] = userSummary
+		}
+	}
+
+	c.JSON(http.StatusOK, dto.NewSuccessResponse("Token muvaffaqiyatli yangilandi", responseData))
+}
+
+// GetMe godoc
+// @Summary Avtorizatsiyadan o‘tgan foydalanuvchi ma’lumotlarini olish
+// @Description Token orqali har qanday roldagi joriy foydalanuvchi ma’lumotlarini qaytaradi
+// @Tags Auth
+// @Security BearerAuth
+// @Router /api/v1/auth/me [get]
+func (h *AuthHandler) GetMe(c *gin.Context) {
+	userID, ok := middleware.GetCurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("Avtorizatsiya talab qilinadi", nil))
+		return
+	}
+
+	userSummary, err := h.authService.GetMe(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("Foydalanuvchi topilmadi yoki faol emas", nil))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.NewSuccessResponse("Foydalanuvchi ma’lumotlari", userSummary))
 }
 
 // Logout godoc

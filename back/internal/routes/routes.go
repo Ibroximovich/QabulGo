@@ -83,6 +83,7 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 			auth.POST("/logout", rc.AuthHandler.Logout)
 			auth.POST("/forgot-password", rc.AuthHandler.ForgotPassword)
 			auth.POST("/reset-password", rc.AuthHandler.ResetPassword)
+			auth.GET("/me", middleware.Auth(rc.Config), rc.AuthHandler.GetMe)
 		}
 
 		// 2. Public Specialties Route (Public / Unauthenticated)

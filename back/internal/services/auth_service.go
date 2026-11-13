@@ -42,6 +42,7 @@ type AuthService interface {
 	LoginSuperAdmin(ctx context.Context, req *dto.SuperAdminLoginRequest) (*dto.LoginData, string, time.Time, error)
 	ForgotPassword(ctx context.Context, req *dto.ForgotPasswordRequest) error
 	ResetPassword(ctx context.Context, req *dto.ResetPasswordRequest) error
+	GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserSummary, error)
 }
 
 type authService struct {
@@ -475,3 +476,22 @@ func (s *authService) ResetPassword(ctx context.Context, req *dto.ResetPasswordR
 
 	return nil
 }
+
+func (s *authService) GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserSummary, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !user.IsActive() {
+		return nil, ErrAccountBlocked
+	}
+	return &dto.UserSummary{
+		ID:        user.ID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Email:     user.Email,
+		Phone:     user.Phone,
+		Role:      string(user.Role),
+	}, nil
+}
+

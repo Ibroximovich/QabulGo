@@ -30,8 +30,13 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
       return;
     }
 
+    // Wait until user object and its role are fully resolved!
+    if (!user || !user.role) {
+      return;
+    }
+
     if (allowedRoles && allowedRoles.length > 0) {
-      const currentRole = user?.role || 'patient';
+      const currentRole = user.role;
       if (!allowedRoles.includes(currentRole)) {
         if (currentRole === 'super_admin') {
           router.replace('/admin/clinics');
@@ -41,18 +46,22 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
           router.replace('/clinic/dashboard');
           return;
         }
+        if (currentRole === 'doctor') {
+          router.replace('/doctor/dashboard');
+          return;
+        }
         router.replace('/dashboard');
         return;
       }
     }
   }, [isLoading, isAuthenticated, user, allowedRoles, router]);
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || !isAuthenticated || !user || !user.role) {
     return <LoadingSpinner size="full" label="Yuklanmoqda..." />;
   }
 
   if (allowedRoles && allowedRoles.length > 0) {
-    const currentRole = user?.role || 'patient';
+    const currentRole = user.role;
     if (!allowedRoles.includes(currentRole)) {
       return <LoadingSpinner size="full" label="Yuklanmoqda..." />;
     }
@@ -60,4 +69,3 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
 
   return <>{children}</>;
 }
-
