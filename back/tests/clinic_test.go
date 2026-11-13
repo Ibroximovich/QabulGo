@@ -690,8 +690,30 @@ func TestSpecialties_List(t *testing.T) {
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
-	if len(resp.Data) == 0 {
-		t.Fatalf("Expected non-empty specialties list")
+	if len(resp.Data) != 36 {
+		t.Fatalf("Expected 36 specialties in catalog, got %d", len(resp.Data))
+	}
+
+	specialtyNames := make(map[string]bool)
+	for _, s := range resp.Data {
+		specialtyNames[s.Name] = true
+	}
+
+	requiredSpecialties := []string{
+		"Terapevt", "Nevrolog", "Kardiolog", "Urolog", "Pediatr",
+		"Dermatolog", "Ginekolog", "Oftalmolog", "LOR (Otorinolaringolog)", "Stomatolog",
+		"Xirurg", "Endokrinolog", "Gastroenterolog", "Ortoped-Travmatolog", "Allergolog",
+		"Onkolog", "Gematolog", "Pulmonolog", "Nefrolog", "Revmatolog",
+		"Infeksionist", "Psixiatr", "Psixoterapevt", "Neyroxirurg", "Anesteziolog-reanimatolog",
+		"Mammolog", "Proktolog", "Androlog", "Gepatolog", "Angioxirurg",
+		"Onkoginekolog", "Bolalar nevrologi", "Bolalar jarrohi", "Neonatolog", "Immunolog",
+		"Parazitolog",
+	}
+
+	for _, reqName := range requiredSpecialties {
+		if !specialtyNames[reqName] {
+			t.Errorf("Missing required specialty: %s", reqName)
+		}
 	}
 }
 

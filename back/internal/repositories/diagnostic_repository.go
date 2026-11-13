@@ -38,6 +38,7 @@ type DiagnosticRepository interface {
 	CreateService(ctx context.Context, svc *models.DiagnosticService) error
 	UpdateService(ctx context.Context, svc *models.DiagnosticService) error
 	GetServiceByID(ctx context.Context, id uuid.UUID) (*models.DiagnosticService, error)
+	ListPublicServices(ctx context.Context, clinicID *uuid.UUID, categoryID *uuid.UUID) ([]models.DiagnosticService, error)
 	ListServicesByClinic(ctx context.Context, clinicID uuid.UUID, categoryID *uuid.UUID) ([]models.DiagnosticService, error)
 	ListServicesByEquipment(ctx context.Context, equipmentID uuid.UUID) ([]models.DiagnosticService, error)
 	DeleteService(ctx context.Context, id uuid.UUID) error
@@ -131,14 +132,84 @@ func (r *diagnosticRepository) ListEquipmentsByClinic(ctx context.Context, clini
 	var list []models.DiagnosticEquipment
 	err := r.db.WithContext(ctx).
 		Preload("Category").
-		Where("clinic_id = ?", clinicID).
+		Where("clinic_id = ? AND is_active = true", clinicID).
 		Order("created_at DESC").
 		Find(&list).Error
 	return list, err
 }
 
 func (r *diagnosticRepository) DeleteEquipment(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&models.DiagnosticEquipment{}, "id = ?", id).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. Faol (tasdiqlangan) qabullar borligini tekshirish
+		var activeCount int64
+		if err := tx.Model(&models.DiagnosticAppointment{}).
+			Where("equipment_id = ? AND status = ?", id, models.DiagAppointmentStatusConfirmed).
+			Count(&activeCount).Error; err != nil {
+			return err
+		}
+		if activeCount > 0 {
+			return errors.New("ushbu uskunada tasdiqlangan faol qabullar mavjud. Avval ularni yakunlang yoki bekor qiling")
+		}
+
+		// 2. Biriktirilgan xizmatlarda faol qabullar borligini tekshirish
+		var serviceActiveCount int64
+		if err := tx.Model(&models.DiagnosticAppointment{}).
+			Joins("JOIN diagnostic_services ON diagnostic_services.id = diagnostic_appointments.service_id").
+			Where("diagnostic_services.equipment_id = ? AND diagnostic_appointments.status = ?", id, models.DiagAppointmentStatusConfirmed).
+			Count(&serviceActiveCount).Error; err != nil {
+			return err
+		}
+		if serviceActiveCount > 0 {
+			return errors.New("ushbu uskunaga biriktirilgan xizmatlarda faol qabullar mavjud. Avval ularni yakunlang yoki bekor qiling")
+		}
+
+		// 3. Tarixiy qabullar (yakunlangan/bekor qilingan) mavjudligini tekshirish
+		var totalAppts int64
+		if err := tx.Model(&models.DiagnosticAppointment{}).
+			Where("equipment_id = ?", id).
+			Count(&totalAppts).Error; err != nil {
+			return err
+		}
+		var totalServiceAppts int64
+		if err := tx.Model(&models.DiagnosticAppointment{}).
+			Joins("JOIN diagnostic_services ON diagnostic_services.id = diagnostic_appointments.service_id").
+			Where("diagnostic_services.equipment_id = ?", id).
+			Count(&totalServiceAppts).Error; err != nil {
+			return err
+		}
+
+		// Agar tarixiy qabullar bo'lsa, xorijiy kalit (FK) yaxlitligini buzmaslik uchun xavfsiz soft-delete (nofaol) qilamiz
+		if totalAppts > 0 || totalServiceAppts > 0 {
+			if err := tx.Model(&models.DiagnosticEquipment{}).Where("id = ?", id).Update("is_active", false).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&models.DiagnosticService{}).Where("equipment_id = ?", id).Update("is_active", false).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("equipment_id = ?", id).Delete(&models.DiagnosticWeeklySlot{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("equipment_id = ?", id).Delete(&models.DiagnosticDateSlotOverride{}).Error; err != nil {
+				return err
+			}
+			return nil
+		}
+
+		// Agar hech qanday qabul bo'lmasa, to'liq kaskadli o'chirish
+		if err := tx.Where("equipment_id = ?", id).Delete(&models.DiagnosticDateSlotOverride{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("equipment_id = ?", id).Delete(&models.DiagnosticWeeklySlot{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("equipment_id = ?", id).Delete(&models.DiagnosticService{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", id).Delete(&models.DiagnosticEquipment{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // --- Services ---
@@ -167,11 +238,35 @@ func (r *diagnosticRepository) GetServiceByID(ctx context.Context, id uuid.UUID)
 	return &svc, nil
 }
 
+func (r *diagnosticRepository) ListPublicServices(ctx context.Context, clinicID *uuid.UUID, categoryID *uuid.UUID) ([]models.DiagnosticService, error) {
+	query := r.db.WithContext(ctx).
+		Preload("Category").
+		Preload("Equipment").
+		Preload("Clinic").
+		Joins("JOIN clinics ON clinics.id = diagnostic_services.clinic_id").
+		Joins("JOIN diagnostic_equipments ON diagnostic_equipments.id = diagnostic_services.equipment_id").
+		Where("clinics.status = ?", "approved").
+		Where("diagnostic_equipments.is_active = ?", true).
+		Where("diagnostic_services.is_active = ?", true)
+
+	if clinicID != nil {
+		query = query.Where("diagnostic_services.clinic_id = ?", *clinicID)
+	}
+
+	if categoryID != nil {
+		query = query.Where("diagnostic_services.category_id = ?", *categoryID)
+	}
+
+	var list []models.DiagnosticService
+	err := query.Order("diagnostic_services.name ASC").Find(&list).Error
+	return list, err
+}
+
 func (r *diagnosticRepository) ListServicesByClinic(ctx context.Context, clinicID uuid.UUID, categoryID *uuid.UUID) ([]models.DiagnosticService, error) {
 	query := r.db.WithContext(ctx).
 		Preload("Category").
 		Preload("Equipment").
-		Where("clinic_id = ?", clinicID)
+		Where("clinic_id = ? AND is_active = true", clinicID)
 
 	if categoryID != nil {
 		query = query.Where("category_id = ?", *categoryID)
@@ -186,14 +281,41 @@ func (r *diagnosticRepository) ListServicesByEquipment(ctx context.Context, equi
 	var list []models.DiagnosticService
 	err := r.db.WithContext(ctx).
 		Preload("Category").
-		Where("equipment_id = ?", equipmentID).
+		Where("equipment_id = ? AND is_active = true", equipmentID).
 		Order("name ASC").
 		Find(&list).Error
 	return list, err
 }
 
 func (r *diagnosticRepository) DeleteService(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&models.DiagnosticService{}, "id = ?", id).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. Faol (tasdiqlangan) qabullar borligini tekshirish
+		var activeCount int64
+		if err := tx.Model(&models.DiagnosticAppointment{}).
+			Where("service_id = ? AND status = ?", id, models.DiagAppointmentStatusConfirmed).
+			Count(&activeCount).Error; err != nil {
+			return err
+		}
+		if activeCount > 0 {
+			return errors.New("ushbu xizmatda tasdiqlangan faol qabullar mavjud. Avval ularni yakunlang yoki bekor qiling")
+		}
+
+		// 2. Tarixiy qabullar borligini tekshirish
+		var totalAppts int64
+		if err := tx.Model(&models.DiagnosticAppointment{}).
+			Where("service_id = ?", id).
+			Count(&totalAppts).Error; err != nil {
+			return err
+		}
+
+		if totalAppts > 0 {
+			// Soft delete (nofaol qilish)
+			return tx.Model(&models.DiagnosticService{}).Where("id = ?", id).Update("is_active", false).Error
+		}
+
+		// Qabul bo'lmagan xizmatni to'liq o'chirish
+		return tx.Where("id = ?", id).Delete(&models.DiagnosticService{}).Error
+	})
 }
 
 // --- Schedule & Slots ---
@@ -214,6 +336,11 @@ func (r *diagnosticRepository) SaveWeeklySlots(ctx context.Context, equipmentID 
 			return err
 		}
 		if len(slots) > 0 {
+			for i := range slots {
+				if slots[i].ID == uuid.Nil {
+					slots[i].ID = uuid.New()
+				}
+			}
 			if err := tx.Create(&slots).Error; err != nil {
 				return err
 			}
@@ -268,7 +395,7 @@ func (r *diagnosticRepository) GetEquipmentAvailabilityData(
 
 	var weeklySlots []models.DiagnosticWeeklySlot
 	err = r.db.WithContext(ctx).
-		Where("equipment_id = ? AND weekday = ? AND status = 'active'", equipmentID, weekday).
+		Where("equipment_id = ? AND weekday = ? AND (LOWER(status) = 'active' OR status = '' OR status IS NULL)", equipmentID, weekday).
 		Order("start_time ASC").
 		Find(&weeklySlots).Error
 	if err != nil {
@@ -310,6 +437,9 @@ func (r *diagnosticRepository) CreateAppointment(ctx context.Context, appt *mode
 		}
 
 		// 3. Create appointment
+		if appt.ID == uuid.Nil {
+			appt.ID = uuid.New()
+		}
 		if err := tx.Create(appt).Error; err != nil {
 			if strings.Contains(err.Error(), "uq_equipment_active_slot") ||
 				strings.Contains(err.Error(), "uq_diag_patient_active_slot") {
@@ -330,6 +460,7 @@ func (r *diagnosticRepository) GetAppointmentByID(ctx context.Context, id uuid.U
 		Preload("Patient").
 		Preload("Clinic").
 		Preload("Service").
+		Preload("Service.Category").
 		Preload("Equipment").
 		First(&appt, "id = ?", id).Error
 	if err != nil {
@@ -347,6 +478,7 @@ func (r *diagnosticRepository) FindByIdempotencyKey(ctx context.Context, patient
 		Preload("Patient").
 		Preload("Clinic").
 		Preload("Service").
+		Preload("Service.Category").
 		Preload("Equipment").
 		First(&appt, "patient_id = ? AND idempotency_key = ?", patientID, key).Error
 	if err != nil {
@@ -530,3 +662,4 @@ func (r *diagnosticRepository) GetBookedSlotsForEquipment(ctx context.Context, e
 		Find(&list).Error
 	return list, err
 }
+

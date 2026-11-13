@@ -530,8 +530,8 @@ func TestSchedule_PublicAvailability(t *testing.T) {
 		{ClinicDoctorID: cd.ID, Weekday: 4, StartTime: "11:00", EndTime: "12:00", Status: models.SlotStatusActive},
 	})
 
-	// Target future Thursday: 2026-11-05 (Thursday)
-	availURL := fmt.Sprintf("/api/v1/public/clinics/%s/doctors/%s/availability?date=2026-11-05", clinic.ID, doctor.ID)
+	// Target future Thursday: 2026-11-19 (Thursday)
+	availURL := fmt.Sprintf("/api/v1/public/clinics/%s/doctors/%s/availability?date=2026-11-19", clinic.ID, doctor.ID)
 	req, _ := http.NewRequest(http.MethodGet, availURL, nil)
 	w := httptest.NewRecorder()
 	app.Router.ServeHTTP(w, req)
@@ -550,12 +550,12 @@ func TestSchedule_PublicAvailability(t *testing.T) {
 		t.Errorf("Expected 3 available slots on future date, got %d", len(availResp.Slots))
 	}
 
-	// Apply an exception: slot 10:00-11:00 is closed on 2026-11-05
+	// Apply an exception: slot 10:00-11:00 is closed on 2026-11-19
 	st10 := "10:00"
 	et11 := "11:00"
 	_ = app.ScheduleRepo.CreateDateOverride(context.Background(), &models.DoctorDateSlotOverride{
 		ClinicDoctorID: cd.ID,
-		Date:           "2026-11-05",
+		Date:           "2026-11-19",
 		StartTime:      &st10,
 		EndTime:        &et11,
 		Status:         models.OverrideStatusClosed,
@@ -576,10 +576,10 @@ func TestSchedule_PublicAvailability(t *testing.T) {
 		t.Errorf("Expected 2 available slots after closing 10:00-11:00, got %d", len(availResp2.Slots))
 	}
 
-	// Add Day Off override on 2026-11-05
+	// Add Day Off override on 2026-11-19
 	_ = app.ScheduleRepo.CreateDateOverride(context.Background(), &models.DoctorDateSlotOverride{
 		ClinicDoctorID: cd.ID,
-		Date:           "2026-11-05",
+		Date:           "2026-11-19",
 		Status:         models.OverrideStatusDayOff,
 		Reason:         "Bayram kuni",
 	})
@@ -608,7 +608,7 @@ func TestSchedule_PublicAvailability_InactiveDoctorOrClinic(t *testing.T) {
 	// Seed pending clinic
 	pendingClinic, doctor, _ := seedClinicAndDoctor(app, ownerID, models.ClinicStatusPending, true)
 
-	url := fmt.Sprintf("/api/v1/public/clinics/%s/doctors/%s/availability?date=2026-11-05", pendingClinic.ID, doctor.ID)
+	url := fmt.Sprintf("/api/v1/public/clinics/%s/doctors/%s/availability?date=2026-11-19", pendingClinic.ID, doctor.ID)
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	app.Router.ServeHTTP(w, req)
@@ -706,18 +706,18 @@ func TestSchedule_FullFlow_Generate35Slots_PutAndAvailability(t *testing.T) {
 	}
 
 	// 5. Test Public Availability for each day:
-	// Monday 2026-11-09 to Friday 2026-11-13 should each return 7 slots
-	// Saturday 2026-11-14 should return 0 slots
+	// Monday 2026-11-16 to Friday 2026-11-20 should each return 7 slots
+	// Saturday 2026-11-21 should return 0 slots
 	testDates := []struct {
 		date  string
 		slots int
 	}{
-		{"2026-11-09", 7}, // Monday
-		{"2026-11-10", 7}, // Tuesday
-		{"2026-11-11", 7}, // Wednesday
-		{"2026-11-12", 7}, // Thursday
-		{"2026-11-13", 7}, // Friday
-		{"2026-11-14", 0}, // Saturday
+		{"2026-11-16", 7}, // Monday
+		{"2026-11-17", 7}, // Tuesday
+		{"2026-11-18", 7}, // Wednesday
+		{"2026-11-19", 7}, // Thursday
+		{"2026-11-20", 7}, // Friday
+		{"2026-11-21", 0}, // Saturday
 	}
 
 	for _, tc := range testDates {
@@ -770,20 +770,20 @@ func TestSchedule_FullFlow_Generate35Slots_PutAndAvailability(t *testing.T) {
 		t.Errorf("Expected 409 Conflict for cross-clinic schedule collision, got %d: %s", wConflict.Code, wConflict.Body.String())
 	}
 
-	// 7. Test Exception Override: close 10:00-11:00 slot on Monday 2026-11-09
+	// 7. Test Exception Override: close 10:00-11:00 slot on Monday 2026-11-16
 	st10 := "10:00"
 	et11 := "11:00"
 	_ = app.ScheduleRepo.CreateDateOverride(context.Background(), &models.DoctorDateSlotOverride{
 		ClinicDoctorID: cd.ID,
-		Date:           "2026-11-09",
+		Date:           "2026-11-16",
 		StartTime:      &st10,
 		EndTime:        &et11,
 		Status:         models.OverrideStatusClosed,
 		Reason:         "Vrach bemor ko'rikida",
 	})
 
-	// Monday 2026-11-09 should now have 6 slots (10:00-11:00 removed)
-	reqAfterEx, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/public/clinics/%s/doctors/%s/availability?date=2026-11-09", clinic.ID, doctor.ID), nil)
+	// Monday 2026-11-16 should now have 6 slots (10:00-11:00 removed)
+	reqAfterEx, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/public/clinics/%s/doctors/%s/availability?date=2026-11-16", clinic.ID, doctor.ID), nil)
 	wAfterEx := httptest.NewRecorder()
 	app.Router.ServeHTTP(wAfterEx, reqAfterEx)
 

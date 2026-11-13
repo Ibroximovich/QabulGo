@@ -69,6 +69,7 @@ func main() {
 	telegramRepo := repositories.NewTelegramRepository(db)
 	outboxRepo := repositories.NewNotificationOutboxRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
+	diagnosticRepo := repositories.NewDiagnosticRepository(db)
 
 	// 4. Services initsializatsiyasi
 	emailService := services.NewEmailService(cfg)
@@ -83,6 +84,7 @@ func main() {
 	publicSearchService := services.NewPublicSearchService(publicSearchRepo, doctorRepo)
 	scheduleService := services.NewScheduleService(scheduleRepo, clinicRepo, auditRepo, appointmentRepo)
 	appointmentService := services.NewAppointmentService(appointmentRepo, scheduleRepo, clinicRepo, auditRepo, outboxRepo)
+	diagnosticService := services.NewDiagnosticService(diagnosticRepo, clinicRepo, auditRepo, outboxRepo)
 	telegramService := services.NewTelegramService(cfg, db, telegramRepo, outboxRepo, clinicRepo, appointmentRepo, userRepo, adminService)
 	outboxWorker := services.NewNotificationWorker(outboxRepo, telegramService)
 
@@ -110,6 +112,7 @@ func main() {
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
 	appointmentHandler := handlers.NewAppointmentHandler(appointmentService)
 	telegramHandler := handlers.NewTelegramHandler(telegramService)
+	diagnosticHandler := handlers.NewDiagnosticHandler(diagnosticService)
 
 	// 6. Router initsializatsiyasi
 	router := routes.SetupRouter(&routes.RouterConfig{
@@ -126,6 +129,7 @@ func main() {
 		ScheduleHandler:     scheduleHandler,
 		AppointmentHandler:  appointmentHandler,
 		TelegramHandler:     telegramHandler,
+		DiagnosticHandler:   diagnosticHandler,
 	})
 
 	// 7. HTTP Server sozlamalari

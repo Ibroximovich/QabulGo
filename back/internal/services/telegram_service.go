@@ -1154,6 +1154,10 @@ func (s *telegramService) DispatchOutboxNotification(ctx context.Context, item *
 		return s.dispatchAppointmentCreated(ctx, item)
 	case "appointment_cancelled":
 		return s.dispatchAppointmentCancelled(ctx, item)
+	case "diagnostic_appointment_created":
+		return s.dispatchDiagnosticAppointmentCreated(ctx, item)
+	case "diagnostic_appointment_cancelled":
+		return s.dispatchDiagnosticAppointmentCancelled(ctx, item)
 	case "clinic_submitted":
 		return s.dispatchClinicSubmitted(ctx, item)
 	default:
@@ -1164,17 +1168,24 @@ func (s *telegramService) DispatchOutboxNotification(ctx context.Context, item *
 
 func (s *telegramService) dispatchAppointmentCreated(ctx context.Context, item *models.NotificationOutbox) error {
 	if s.clinicBotClient == nil {
+		log.Printf("[Telegram Clinic Bot] Clinic Bot sozlanmagan, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Clinic Bot sozlanmagan")
 		return nil
 	}
 
 	if item.TargetClinicID == nil {
+		log.Printf("[Telegram Clinic Bot] TargetClinicID yo'q, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "TargetClinicID yo‘q")
 		return nil
 	}
 
 	recipients, err := s.telegramRepo.GetActiveClinicRecipients(ctx, *item.TargetClinicID)
-	if err != nil || len(recipients) == 0 {
+	if err != nil {
+		log.Printf("[Telegram Clinic Bot] GetActiveClinicRecipients xatoligi (ClinicID: %s): %v\n", *item.TargetClinicID, err)
+		return err
+	}
+	if len(recipients) == 0 {
+		log.Printf("[Telegram Clinic Bot] Ulangan faol recipientlar yo'q (ClinicID: %s), outbox (ID: %s) o'tkazib yuborildi\n", *item.TargetClinicID, item.ID)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Ulangan faol recipientlar yo‘q")
 		return nil
 	}
@@ -1192,8 +1203,34 @@ func (s *telegramService) dispatchAppointmentCreated(ctx context.Context, item *
 		Price         float64 `json:"price"`
 	}
 	if err := json.Unmarshal([]byte(item.Payload), &data); err != nil {
+		log.Printf("[Telegram Clinic Bot] Payload parslash xatoligi (outbox ID: %s): %v\n", item.ID, err)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Payload parslash xatoligi")
 		return nil
+	}
+
+	clinicDisplay := escapeTelegramHTML(strings.TrimSpace(data.ClinicName))
+	if clinicDisplay == "" {
+		clinicDisplay = "Klinika"
+	}
+
+	patientDisplay := escapeTelegramHTML(strings.TrimSpace(data.PatientName))
+	if patientDisplay == "" {
+		patientDisplay = "Bemor"
+	}
+
+	phoneDisplay := escapeTelegramHTML(strings.TrimSpace(data.PatientPhone))
+	if phoneDisplay == "" {
+		phoneDisplay = "Ko‘rsatilmagan"
+	}
+
+	doctorDisplay := escapeTelegramHTML(strings.TrimSpace(data.DoctorName))
+	if doctorDisplay == "" {
+		doctorDisplay = "Shifokor"
+	}
+
+	specialtyDisplay := escapeTelegramHTML(strings.TrimSpace(data.Specialty))
+	if specialtyDisplay == "" {
+		specialtyDisplay = "Mutaxassis"
 	}
 
 	formattedPrice := fmt.Sprintf("%.0f so‘m", data.Price)
@@ -1207,7 +1244,7 @@ func (s *telegramService) dispatchAppointmentCreated(ctx context.Context, item *
 		"🕙 <b>Vaqt:</b> %s–%s\n"+
 		"💰 <b>Qabul narxi:</b> %s\n"+
 		"✅ <b>Holat:</b> Tasdiqlangan",
-		data.ClinicName, data.PatientName, data.PatientPhone, data.DoctorName, data.Specialty,
+		clinicDisplay, patientDisplay, phoneDisplay, doctorDisplay, specialtyDisplay,
 		data.Date, data.StartTime, data.EndTime, formattedPrice)
 
 	markup := &telegram.InlineKeyboardMarkup{
@@ -1225,11 +1262,15 @@ func (s *telegramService) dispatchAppointmentCreated(ctx context.Context, item *
 	for _, r := range recipients {
 		_, err := s.clinicBotClient.SendMessage(ctx, r.TelegramChatID, text, markup)
 		if err != nil {
+			log.Printf("[Telegram Clinic Bot] SendMessage xatoligi (ChatID=%d, ClinicID=%s): %v\n", r.TelegramChatID, *item.TargetClinicID, err)
 			if errors.Is(err, telegram.ErrBotBlockedByUser) {
+				log.Printf("[Telegram Clinic Bot] Foydalanuvchi botni bloklagan (ChatID=%d), recipient nofaol qilindi\n", r.TelegramChatID)
 				_ = s.telegramRepo.DeactivateRecipientByChatID(ctx, r.TelegramChatID)
 			} else {
 				allSent = false
 			}
+		} else {
+			log.Printf("[Telegram Clinic Bot] Yangi shifokor qabuli xabarnomasi yuborildi (ChatID=%d, ClinicID=%s, ApptID=%s)\n", r.TelegramChatID, *item.TargetClinicID, data.AppointmentID)
 		}
 	}
 
@@ -1241,17 +1282,24 @@ func (s *telegramService) dispatchAppointmentCreated(ctx context.Context, item *
 
 func (s *telegramService) dispatchAppointmentCancelled(ctx context.Context, item *models.NotificationOutbox) error {
 	if s.clinicBotClient == nil {
+		log.Printf("[Telegram Clinic Bot] Clinic Bot sozlanmagan, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Clinic Bot sozlanmagan")
 		return nil
 	}
 
 	if item.TargetClinicID == nil {
+		log.Printf("[Telegram Clinic Bot] TargetClinicID yo'q, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "TargetClinicID yo‘q")
 		return nil
 	}
 
 	recipients, err := s.telegramRepo.GetActiveClinicRecipients(ctx, *item.TargetClinicID)
-	if err != nil || len(recipients) == 0 {
+	if err != nil {
+		log.Printf("[Telegram Clinic Bot] GetActiveClinicRecipients xatoligi (ClinicID: %s): %v\n", *item.TargetClinicID, err)
+		return err
+	}
+	if len(recipients) == 0 {
+		log.Printf("[Telegram Clinic Bot] Ulangan faol recipientlar yo'q (ClinicID: %s), outbox (ID: %s) o'tkazib yuborildi\n", *item.TargetClinicID, item.ID)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Ulangan faol recipientlar yo‘q")
 		return nil
 	}
@@ -1268,8 +1316,34 @@ func (s *telegramService) dispatchAppointmentCancelled(ctx context.Context, item
 		Reason        string `json:"reason"`
 	}
 	if err := json.Unmarshal([]byte(item.Payload), &data); err != nil {
+		log.Printf("[Telegram Clinic Bot] Payload parslash xatoligi (outbox ID: %s): %v\n", item.ID, err)
 		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Payload parslash xatoligi")
 		return nil
+	}
+
+	clinicDisplay := escapeTelegramHTML(strings.TrimSpace(data.ClinicName))
+	if clinicDisplay == "" {
+		clinicDisplay = "Klinika"
+	}
+
+	patientDisplay := escapeTelegramHTML(strings.TrimSpace(data.PatientName))
+	if patientDisplay == "" {
+		patientDisplay = "Bemor"
+	}
+
+	doctorDisplay := escapeTelegramHTML(strings.TrimSpace(data.DoctorName))
+	if doctorDisplay == "" {
+		doctorDisplay = "Shifokor"
+	}
+
+	cancelledByDisplay := escapeTelegramHTML(strings.TrimSpace(data.CancelledBy))
+	if cancelledByDisplay == "" {
+		cancelledByDisplay = "Bemor"
+	}
+
+	reasonDisplay := escapeTelegramHTML(strings.TrimSpace(data.Reason))
+	if reasonDisplay == "" {
+		reasonDisplay = "Ko‘rsatilmagan"
 	}
 
 	text := fmt.Sprintf("❌ <b>QABUL BEKOR QILINDI</b>\n\n"+
@@ -1280,8 +1354,8 @@ func (s *telegramService) dispatchAppointmentCancelled(ctx context.Context, item
 		"⚠️ <b>Bekor qilgan:</b> %s\n"+
 		"📝 <b>Sabab:</b> %s\n"+
 		"🔴 <b>Holat:</b> Bekor qilingan",
-		data.ClinicName, data.PatientName, data.DoctorName, data.Date, data.StartTime, data.EndTime,
-		data.CancelledBy, data.Reason)
+		clinicDisplay, patientDisplay, doctorDisplay, data.Date, data.StartTime, data.EndTime,
+		cancelledByDisplay, reasonDisplay)
 
 	markup := &telegram.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telegram.InlineKeyboardButton{
@@ -1298,11 +1372,250 @@ func (s *telegramService) dispatchAppointmentCancelled(ctx context.Context, item
 	for _, r := range recipients {
 		_, err := s.clinicBotClient.SendMessage(ctx, r.TelegramChatID, text, markup)
 		if err != nil {
+			log.Printf("[Telegram Clinic Bot] SendMessage xatoligi (ChatID=%d, ClinicID=%s): %v\n", r.TelegramChatID, *item.TargetClinicID, err)
 			if errors.Is(err, telegram.ErrBotBlockedByUser) {
+				log.Printf("[Telegram Clinic Bot] Foydalanuvchi botni bloklagan (ChatID=%d), recipient nofaol qilindi\n", r.TelegramChatID)
 				_ = s.telegramRepo.DeactivateRecipientByChatID(ctx, r.TelegramChatID)
 			} else {
 				allSent = false
 			}
+		} else {
+			log.Printf("[Telegram Clinic Bot] Shifokor qabuli bekor qilingani haqida xabar yuborildi (ChatID=%d, ClinicID=%s, ApptID=%s)\n", r.TelegramChatID, *item.TargetClinicID, data.AppointmentID)
+		}
+	}
+
+	if allSent {
+		return s.outboxRepo.MarkDelivered(ctx, item.ID)
+	}
+	return s.outboxRepo.MarkFailed(ctx, item.ID, "Ba'zi recipientlarga xabar yetib bormadi", true, 30*time.Second)
+}
+
+func (s *telegramService) dispatchDiagnosticAppointmentCreated(ctx context.Context, item *models.NotificationOutbox) error {
+	if s.clinicBotClient == nil {
+		log.Printf("[Telegram Clinic Bot] Clinic Bot sozlanmagan, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Clinic Bot sozlanmagan")
+		return nil
+	}
+
+	if item.TargetClinicID == nil {
+		log.Printf("[Telegram Clinic Bot] TargetClinicID yo'q, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "TargetClinicID yo‘q")
+		return nil
+	}
+
+	recipients, err := s.telegramRepo.GetActiveClinicRecipients(ctx, *item.TargetClinicID)
+	if err != nil {
+		log.Printf("[Telegram Clinic Bot] GetActiveClinicRecipients xatoligi (ClinicID: %s): %v\n", *item.TargetClinicID, err)
+		return err
+	}
+	if len(recipients) == 0 {
+		log.Printf("[Telegram Clinic Bot] Ulangan faol recipientlar yo'q (ClinicID: %s), outbox (ID: %s) o'tkazib yuborildi\n", *item.TargetClinicID, item.ID)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Ulangan faol recipientlar yo‘q")
+		return nil
+	}
+
+	var data struct {
+		AppointmentID   string  `json:"appointment_id"`
+		ClinicName      string  `json:"clinic_name"`
+		EquipmentName   string  `json:"equipment_name"`
+		ServiceName     string  `json:"service_name"`
+		ServiceCategory string  `json:"service_category"`
+		PatientName     string  `json:"patient_name"`
+		PatientPhone    string  `json:"patient_phone"`
+		Date            string  `json:"date"`
+		StartTime       string  `json:"start_time"`
+		EndTime         string  `json:"end_time"`
+		Price           float64 `json:"price"`
+	}
+	if err := json.Unmarshal([]byte(item.Payload), &data); err != nil {
+		log.Printf("[Telegram Clinic Bot] Payload parslash xatoligi (outbox ID: %s): %v\n", item.ID, err)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Payload parslash xatoligi")
+		return nil
+	}
+
+	clinicDisplay := escapeTelegramHTML(strings.TrimSpace(data.ClinicName))
+	if clinicDisplay == "" {
+		clinicDisplay = "Klinika"
+	}
+
+	equipmentDisplay := escapeTelegramHTML(strings.TrimSpace(data.EquipmentName))
+	if equipmentDisplay == "" {
+		equipmentDisplay = "Diagnostika uskunasi"
+	}
+
+	serviceDisplay := escapeTelegramHTML(strings.TrimSpace(data.ServiceName))
+	if serviceDisplay == "" {
+		serviceDisplay = "Diagnostika xizmati"
+	}
+
+	patientDisplay := escapeTelegramHTML(strings.TrimSpace(data.PatientName))
+	if patientDisplay == "" {
+		patientDisplay = "Bemor"
+	}
+
+	phoneDisplay := escapeTelegramHTML(strings.TrimSpace(data.PatientPhone))
+	if phoneDisplay == "" {
+		phoneDisplay = "Ko‘rsatilmagan"
+	}
+
+	formattedPrice := fmt.Sprintf("%.0f so‘m", data.Price)
+
+	text := fmt.Sprintf("🩺 <b>Yangi Diagnostika Broni!</b>\n\n"+
+		"🏥 <b>Klinika:</b> %s\n"+
+		"🔬 <b>Uskuna:</b> %s\n"+
+		"📋 <b>Xizmat turi:</b> %s\n"+
+		"👤 <b>Bemor:</b> %s\n"+
+		"📞 <b>Telefon:</b> %s\n"+
+		"📅 <b>Sana:</b> %s\n"+
+		"🕙 <b>Vaqt:</b> %s–%s\n"+
+		"💰 <b>Narxi:</b> %s\n"+
+		"✅ <b>Holat:</b> Tasdiqlangan",
+		clinicDisplay, equipmentDisplay, serviceDisplay,
+		patientDisplay, phoneDisplay,
+		data.Date, data.StartTime, data.EndTime, formattedPrice)
+
+	markup := &telegram.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telegram.InlineKeyboardButton{
+			{
+				{
+					Text: "🌐 Saytga o‘tish",
+					URL:  s.buildWebURL("/clinic/diagnostics?tab=appointments"),
+				},
+			},
+		},
+	}
+
+	allSent := true
+	for _, r := range recipients {
+		_, err := s.clinicBotClient.SendMessage(ctx, r.TelegramChatID, text, markup)
+		if err != nil {
+			log.Printf("[Telegram Clinic Bot] SendMessage xatoligi (ChatID=%d, ClinicID=%s): %v\n", r.TelegramChatID, *item.TargetClinicID, err)
+			if errors.Is(err, telegram.ErrBotBlockedByUser) {
+				log.Printf("[Telegram Clinic Bot] Foydalanuvchi botni bloklagan (ChatID=%d), recipient nofaol qilindi\n", r.TelegramChatID)
+				_ = s.telegramRepo.DeactivateRecipientByChatID(ctx, r.TelegramChatID)
+			} else {
+				allSent = false
+			}
+		} else {
+			log.Printf("[Telegram Clinic Bot] Yangi diagnostika broni xabarnomasi muvaffaqiyatli yuborildi (ChatID=%d, ClinicID=%s, ApptID=%s)\n", r.TelegramChatID, *item.TargetClinicID, data.AppointmentID)
+		}
+	}
+
+	if allSent {
+		return s.outboxRepo.MarkDelivered(ctx, item.ID)
+	}
+	return s.outboxRepo.MarkFailed(ctx, item.ID, "Ba'zi recipientlarga xabar yetib bormadi", true, 30*time.Second)
+}
+
+func (s *telegramService) dispatchDiagnosticAppointmentCancelled(ctx context.Context, item *models.NotificationOutbox) error {
+	if s.clinicBotClient == nil {
+		log.Printf("[Telegram Clinic Bot] Clinic Bot sozlanmagan, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Clinic Bot sozlanmagan")
+		return nil
+	}
+
+	if item.TargetClinicID == nil {
+		log.Printf("[Telegram Clinic Bot] TargetClinicID yo'q, outbox (ID: %s) o'tkazib yuborildi\n", item.ID)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "TargetClinicID yo‘q")
+		return nil
+	}
+
+	recipients, err := s.telegramRepo.GetActiveClinicRecipients(ctx, *item.TargetClinicID)
+	if err != nil {
+		log.Printf("[Telegram Clinic Bot] GetActiveClinicRecipients xatoligi (ClinicID: %s): %v\n", *item.TargetClinicID, err)
+		return err
+	}
+	if len(recipients) == 0 {
+		log.Printf("[Telegram Clinic Bot] Ulangan faol recipientlar yo'q (ClinicID: %s), outbox (ID: %s) o'tkazib yuborildi\n", *item.TargetClinicID, item.ID)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Ulangan faol recipientlar yo‘q")
+		return nil
+	}
+
+	var data struct {
+		AppointmentID string `json:"appointment_id"`
+		ClinicName    string `json:"clinic_name"`
+		EquipmentName string `json:"equipment_name"`
+		ServiceName   string `json:"service_name"`
+		PatientName   string `json:"patient_name"`
+		Date          string `json:"date"`
+		StartTime     string `json:"start_time"`
+		EndTime       string `json:"end_time"`
+		CancelledBy   string `json:"cancelled_by"`
+		Reason        string `json:"reason"`
+	}
+	if err := json.Unmarshal([]byte(item.Payload), &data); err != nil {
+		log.Printf("[Telegram Clinic Bot] Payload parslash xatoligi (outbox ID: %s): %v\n", item.ID, err)
+		_ = s.outboxRepo.MarkSkipped(ctx, item.ID, "Payload parslash xatoligi")
+		return nil
+	}
+
+	clinicDisplay := escapeTelegramHTML(strings.TrimSpace(data.ClinicName))
+	if clinicDisplay == "" {
+		clinicDisplay = "Klinika"
+	}
+
+	equipmentDisplay := escapeTelegramHTML(strings.TrimSpace(data.EquipmentName))
+	if equipmentDisplay == "" {
+		equipmentDisplay = "Diagnostika uskunasi"
+	}
+
+	serviceDisplay := escapeTelegramHTML(strings.TrimSpace(data.ServiceName))
+	if serviceDisplay == "" {
+		serviceDisplay = "Diagnostika xizmati"
+	}
+
+	patientDisplay := escapeTelegramHTML(strings.TrimSpace(data.PatientName))
+	if patientDisplay == "" {
+		patientDisplay = "Bemor"
+	}
+
+	cancelledByDisplay := escapeTelegramHTML(strings.TrimSpace(data.CancelledBy))
+	if cancelledByDisplay == "" {
+		cancelledByDisplay = "Bemor"
+	}
+
+	reasonDisplay := escapeTelegramHTML(strings.TrimSpace(data.Reason))
+	if reasonDisplay == "" {
+		reasonDisplay = "Ko‘rsatilmagan"
+	}
+
+	text := fmt.Sprintf("❌ <b>DIAGNOSTIKA BRONI BEKOR QILINDI</b>\n\n"+
+		"🏥 <b>Klinika:</b> %s\n"+
+		"🔬 <b>Uskuna:</b> %s\n"+
+		"📋 <b>Xizmat:</b> %s\n"+
+		"👤 <b>Bemor:</b> %s\n"+
+		"📅 <b>Sana:</b> %s (%s–%s)\n"+
+		"⚠️ <b>Bekor qilgan:</b> %s\n"+
+		"📝 <b>Sabab:</b> %s\n"+
+		"🔴 <b>Holat:</b> Bekor qilingan",
+		clinicDisplay, equipmentDisplay, serviceDisplay,
+		patientDisplay, data.Date, data.StartTime, data.EndTime,
+		cancelledByDisplay, reasonDisplay)
+
+	markup := &telegram.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telegram.InlineKeyboardButton{
+			{
+				{
+					Text: "🌐 Saytga o‘tish",
+					URL:  s.buildWebURL("/clinic/diagnostics?tab=appointments"),
+				},
+			},
+		},
+	}
+
+	allSent := true
+	for _, r := range recipients {
+		_, err := s.clinicBotClient.SendMessage(ctx, r.TelegramChatID, text, markup)
+		if err != nil {
+			log.Printf("[Telegram Clinic Bot] SendMessage xatoligi (ChatID=%d, ClinicID=%s): %v\n", r.TelegramChatID, *item.TargetClinicID, err)
+			if errors.Is(err, telegram.ErrBotBlockedByUser) {
+				log.Printf("[Telegram Clinic Bot] Foydalanuvchi botni bloklagan (ChatID=%d), recipient nofaol qilindi\n", r.TelegramChatID)
+				_ = s.telegramRepo.DeactivateRecipientByChatID(ctx, r.TelegramChatID)
+			} else {
+				allSent = false
+			}
+		} else {
+			log.Printf("[Telegram Clinic Bot] Diagnostika broni bekor qilingani haqida xabar muvaffaqiyatli yuborildi (ChatID=%d, ClinicID=%s, ApptID=%s)\n", r.TelegramChatID, *item.TargetClinicID, data.AppointmentID)
 		}
 	}
 
@@ -1605,4 +1918,11 @@ func (s *telegramService) getTashkentDateOffset(dayOffset int) string {
 	}
 	target := time.Now().In(loc).AddDate(0, 0, dayOffset)
 	return target.Format("2006-01-02")
+}
+
+func escapeTelegramHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
 }

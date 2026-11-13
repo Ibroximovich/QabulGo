@@ -214,6 +214,14 @@ func setupFixture(app *TestAppointmentApp) *testFixture {
 	}
 	_ = app.ScheduleRepo.ReplaceWeeklySlots(ctx, cd.ID, slots)
 
+	// Ensure TargetDate is always a future Monday
+	now := time.Now()
+	daysUntilMonday := (int(time.Monday) - int(now.Weekday()) + 7) % 7
+	if daysUntilMonday == 0 {
+		daysUntilMonday = 7
+	}
+	futureMonday := now.AddDate(0, 0, daysUntilMonday).Format("2006-01-02")
+
 	return &testFixture{
 		Patient:    patient,
 		PatientTok: pTok,
@@ -223,7 +231,7 @@ func setupFixture(app *TestAppointmentApp) *testFixture {
 		Doctor:     doctor,
 		ClinicDoc:  cd,
 		Specialty:  specialty,
-		TargetDate: "2026-11-09", // Monday
+		TargetDate: futureMonday, // Future Monday
 		StartTime:  "10:00",
 		EndTime:    "11:00",
 	}

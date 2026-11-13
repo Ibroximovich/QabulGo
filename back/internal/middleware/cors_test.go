@@ -68,6 +68,16 @@ func TestCORS_EmptyAndInvalidFrontendURL(t *testing.T) {
 		t.Fatalf("Kutilgan 200, lekin %d", w.Code)
 	}
 
+	// Boshqa localhost porti (masalan 3001) ham devda ruxsat etilishi kerak
+	req3001, _ := http.NewRequest(http.MethodGet, "/ping", nil)
+	req3001.Header.Set("Origin", "http://localhost:3001")
+	w3001 := httptest.NewRecorder()
+	r.ServeHTTP(w3001, req3001)
+
+	if w3001.Code != http.StatusOK {
+		t.Fatalf("Localhost:3001 uchun 200 kutilgan, lekin %d qaytdi", w3001.Code)
+	}
+
 	// * yoki yaroqsiz origin ruxsat etilmasligi kerak
 	badReq, _ := http.NewRequest(http.MethodGet, "/ping", nil)
 	badReq.Header.Set("Origin", "http://evil.com")

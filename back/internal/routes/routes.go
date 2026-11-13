@@ -26,6 +26,7 @@ type RouterConfig struct {
 	ScheduleHandler     *handlers.ScheduleHandler
 	AppointmentHandler  *handlers.AppointmentHandler
 	TelegramHandler     *handlers.TelegramHandler
+	DiagnosticHandler   *handlers.DiagnosticHandler
 }
 
 // SetupRouter initializes and configures the Gin engine with all routes and middlewares
@@ -84,12 +85,38 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 			auth.POST("/reset-password", rc.AuthHandler.ResetPassword)
 		}
 
-		// 2. Public Specialties Route
+		// 2. Public Specialties Route (Public / Unauthenticated)
 		if rc.SpecialtyHandler != nil {
 			v1.GET("/specialties", rc.SpecialtyHandler.ListSpecialties)
 		}
 
-		// 3. Protected Patient Routes
+		// 3. Public Search & Geolocation Routes (Public / Unauthenticated)
+		// Mutlaqo token talab qilinmaydi, barcha mehmonlar va bemorlar uchun ochiq
+		if rc.PublicSearchHandler != nil {
+			public := v1.Group("/public")
+			{
+				// Clinics
+				// MUHIM: /clinics/nearby static route parametrli /clinics/:id dan oldin ro'yxatdan o'tishi shart!
+				public.GET("/clinics/nearby", rc.PublicSearchHandler.SearchNearbyClinics)
+				public.GET("/clinics", rc.PublicSearchHandler.SearchClinics)
+				public.GET("/clinics/:id", rc.PublicSearchHandler.GetClinicDetails)
+				public.GET("/clinics/:id/doctors", rc.PublicSearchHandler.GetClinicDoctors)
+
+				// Doctors
+				public.GET("/doctors", rc.PublicSearchHandler.SearchDoctors)
+				public.GET("/doctors/:id", rc.PublicSearchHandler.GetDoctorDetails)
+
+				// Doctor Availability (Qabul vaqtlari)
+				if rc.ScheduleHandler != nil {
+					public.GET("/clinics/:id/doctors/:doctorId/availability", rc.ScheduleHandler.GetPublicAvailability)
+				}
+
+				// Regions catalog
+				public.GET("/regions", rc.PublicSearchHandler.GetRegionsCatalog)
+			}
+		}
+
+		// 4. Protected Patient Routes
 		patient := v1.Group("/patient")
 		patient.Use(middleware.Auth(rc.Config))
 		patient.Use(middleware.RequireRole(models.RolePatient))
@@ -98,7 +125,7 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 			patient.PATCH("/me", rc.PatientHandler.UpdateProfile)
 		}
 
-		// 4. File Upload (Authenticated Users: ClinicOwner, ClinicAdmin, SuperAdmin)
+		// 5. File Upload (Authenticated Users: ClinicOwner, ClinicAdmin, SuperAdmin)
 		if rc.UploadHandler != nil {
 			upload := v1.Group("/upload")
 			upload.Use(middleware.Auth(rc.Config))
@@ -108,11 +135,15 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 			}
 		}
 
-		// 5. Clinic Profile & Management Routes
+		// 6. Clinic Profile & Management Routes
 		if rc.ClinicHandler != nil {
 			clinics := v1.Group("/clinics")
 			{
-				// Public / General View (status filtered inside handler)
+				// Public / General View (status filtered inside handler, ochiq route)
+				if rc.PublicSearchHandler != nil {
+					clinics.GET("", rc.PublicSearchHandler.SearchClinics)
+					clinics.GET("/nearby", rc.PublicSearchHandler.SearchNearbyClinics)
+				}
 				clinics.GET("/:id", rc.ClinicHandler.GetClinicByID)
 
 				// Authenticated Clinic Owner & Admin Routes
@@ -123,6 +154,8 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 					protectedClinics.POST("", rc.ClinicHandler.CreateClinic)
 					protectedClinics.GET("/mine", rc.ClinicHandler.GetMyClinic)
 					protectedClinics.PATCH("/:id", rc.ClinicHandler.UpdateClinic)
+					protectedClinics.POST("/submit", rc.ClinicHandler.SubmitClinic)
+					protectedClinics.POST("/mine/submit", rc.ClinicHandler.SubmitClinic)
 					protectedClinics.POST("/:id/submit", rc.ClinicHandler.SubmitClinic)
 
 					// Telegram Bot integration routes
@@ -131,6 +164,35 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 						protectedClinics.GET("/:id/telegram/status", rc.TelegramHandler.GetStatus)
 						protectedClinics.DELETE("/:id/telegram/recipients/:recipientId", rc.TelegramHandler.DisconnectRecipient)
 						protectedClinics.PATCH("/:id/telegram/recipients/:recipientId/toggle-notifications", rc.TelegramHandler.ToggleNotifications)
+					}
+
+					// Diagnostic Equipments, Services, Schedules & Appointments
+					if rc.DiagnosticHandler != nil {
+						// Equipments
+						protectedClinics.POST("/:id/diagnostic-equipments", rc.DiagnosticHandler.CreateEquipment)
+						protectedClinics.GET("/:id/diagnostic-equipments", rc.DiagnosticHandler.ListEquipments)
+						protectedClinics.GET("/:id/diagnostic-equipments/:equipmentId", rc.DiagnosticHandler.GetEquipment)
+						protectedClinics.PATCH("/:id/diagnostic-equipments/:equipmentId", rc.DiagnosticHandler.UpdateEquipment)
+						protectedClinics.DELETE("/:id/diagnostic-equipments/:equipmentId", rc.DiagnosticHandler.DeleteEquipment)
+
+						// Services
+						protectedClinics.POST("/:id/diagnostic-services", rc.DiagnosticHandler.CreateService)
+						protectedClinics.GET("/:id/diagnostic-services", rc.DiagnosticHandler.ListClinicServices)
+						protectedClinics.PATCH("/:id/diagnostic-services/:serviceId", rc.DiagnosticHandler.UpdateService)
+						protectedClinics.DELETE("/:id/diagnostic-services/:serviceId", rc.DiagnosticHandler.DeleteService)
+
+						// Equipment Schedule & Overrides
+						protectedClinics.GET("/:id/diagnostic-equipments/:equipmentId/schedule", rc.DiagnosticHandler.GetEquipmentWeeklySlots)
+						protectedClinics.PUT("/:id/diagnostic-equipments/:equipmentId/schedule", rc.DiagnosticHandler.SaveEquipmentWeeklySlots)
+						protectedClinics.GET("/:id/diagnostic-equipments/:equipmentId/schedule/exceptions", rc.DiagnosticHandler.GetEquipmentDateOverrides)
+						protectedClinics.POST("/:id/diagnostic-equipments/:equipmentId/schedule/exceptions", rc.DiagnosticHandler.CreateEquipmentDateOverride)
+						protectedClinics.DELETE("/:id/diagnostic-equipments/:equipmentId/schedule/exceptions/:overrideId", rc.DiagnosticHandler.DeleteEquipmentDateOverride)
+
+						// Clinic Appointments
+						protectedClinics.GET("/:id/diagnostic-appointments", rc.DiagnosticHandler.GetClinicAppointments)
+						protectedClinics.POST("/:id/diagnostic-appointments/:appointmentId/cancel", rc.DiagnosticHandler.CancelClinicAppointment)
+						protectedClinics.POST("/:id/diagnostic-appointments/:appointmentId/complete", rc.DiagnosticHandler.CompleteClinicAppointment)
+						protectedClinics.POST("/:id/diagnostic-appointments/:appointmentId/no-show", rc.DiagnosticHandler.NoShowClinicAppointment)
 					}
 				}
 			}
@@ -236,28 +298,26 @@ func SetupRouter(rc *RouterConfig) *gin.Engine {
 			}
 		}
 
-		// 8. Public Search & Geolocation Routes (Public / Unauthenticated)
-		if rc.PublicSearchHandler != nil {
-			public := v1.Group("/public")
+		// 10. Diagnostics Module Routes (Public & Patient)
+		if rc.DiagnosticHandler != nil {
+			diagnostics := v1.Group("/diagnostics")
 			{
-				// Clinics
-				// MUHIM: /clinics/nearby static route parametrli /clinics/:id dan oldin ro'yxatdan o'tishi shart!
-				public.GET("/clinics/nearby", rc.PublicSearchHandler.SearchNearbyClinics)
-				public.GET("/clinics", rc.PublicSearchHandler.SearchClinics)
-				public.GET("/clinics/:id", rc.PublicSearchHandler.GetClinicDetails)
-				public.GET("/clinics/:id/doctors", rc.PublicSearchHandler.GetClinicDoctors)
+				// Public categories, services and availability
+				diagnostics.GET("/categories", rc.DiagnosticHandler.ListCategories)
+				diagnostics.GET("/services", rc.DiagnosticHandler.ListServices)
+				diagnostics.GET("/services/:serviceId", rc.DiagnosticHandler.GetServiceByID)
+				diagnostics.GET("/equipments/:equipmentId/availability", rc.DiagnosticHandler.GetEquipmentAvailability)
 
-				// Doctors
-				public.GET("/doctors", rc.PublicSearchHandler.SearchDoctors)
-				public.GET("/doctors/:id", rc.PublicSearchHandler.GetDoctorDetails)
-
-				// Doctor Availability (Qabul vaqtlari)
-				if rc.ScheduleHandler != nil {
-					public.GET("/clinics/:id/doctors/:doctorId/availability", rc.ScheduleHandler.GetPublicAvailability)
+				// Protected Patient Diagnostic Appointments
+				patientDiag := diagnostics.Group("/appointments")
+				patientDiag.Use(middleware.Auth(rc.Config))
+				patientDiag.Use(middleware.RequireRole(models.RolePatient))
+				{
+					patientDiag.POST("", rc.DiagnosticHandler.BookAppointment)
+					patientDiag.GET("/my", rc.DiagnosticHandler.GetPatientAppointments)
+					patientDiag.GET("/:appointmentId", rc.DiagnosticHandler.GetPatientAppointmentByID)
+					patientDiag.POST("/:appointmentId/cancel", rc.DiagnosticHandler.CancelPatientAppointment)
 				}
-
-				// Regions catalog
-				public.GET("/regions", rc.PublicSearchHandler.GetRegionsCatalog)
 			}
 		}
 	}

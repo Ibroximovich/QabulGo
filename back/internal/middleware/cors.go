@@ -39,9 +39,18 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 	// In non-production environments, allow local development ports by default
 	if cfg == nil || cfg.AppEnv != "production" {
 		addOrigin("http://localhost:3000")
+		addOrigin("http://localhost:3001")
+		addOrigin("http://localhost:3002")
 		addOrigin("http://localhost:5173")
+		addOrigin("http://localhost:5174")
+		addOrigin("http://localhost:5175")
+		addOrigin("http://localhost:8080")
 		addOrigin("http://127.0.0.1:3000")
+		addOrigin("http://127.0.0.1:3001")
+		addOrigin("http://127.0.0.1:3002")
 		addOrigin("http://127.0.0.1:5173")
+		addOrigin("http://127.0.0.1:5174")
+		addOrigin("http://127.0.0.1:5175")
 	}
 
 	// Safe fallback if no valid origin was provided
@@ -50,10 +59,25 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 		addOrigin("http://localhost:3000")
 	}
 
+	allowOriginFunc := func(origin string) bool {
+		if seen[origin] {
+			return true
+		}
+		if cfg == nil || cfg.AppEnv != "production" {
+			if strings.HasPrefix(origin, "http://localhost:") ||
+				strings.HasPrefix(origin, "http://127.0.0.1:") ||
+				origin == "http://localhost" ||
+				origin == "http://127.0.0.1" {
+				return true
+			}
+		}
+		return false
+	}
+
 	corsConfig := cors.Config{
-		AllowOrigins:     allowedOrigins,
+		AllowOriginFunc:  allowOriginFunc,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "Idempotency-Key", "idempotency-key"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Content-Length", "Accept", "Accept-Encoding", "Accept-Language", "Authorization", "X-Request-ID", "X-Requested-With", "Idempotency-Key", "idempotency-key", "Cache-Control", "Pragma"},
 		ExposeHeaders:    []string{"Content-Length", "X-Request-ID", "Idempotency-Key"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,

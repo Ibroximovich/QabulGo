@@ -15,6 +15,7 @@ import {
   X,
   ChevronDown,
   ShieldCheck,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { BrandLogo } from '@/components/common/BrandLogo';
@@ -61,6 +62,12 @@ export function AppLayout({ children }: AppLayoutProps) {
       name: 'Shifokorlar',
       href: '/doctors',
       icon: Stethoscope,
+      isAvailable: true,
+    },
+    {
+      name: 'Diagnostika',
+      href: '/diagnostics',
+      icon: Activity,
       isAvailable: true,
     },
     {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
+	"time"
 
 	"qabulgo-backend/internal/config"
 	"qabulgo-backend/internal/models"
@@ -17,6 +19,7 @@ type StubTelegramRepo struct {
 	processedUpdates map[int64]bool
 	adminTokens      map[string]*models.AdminTelegramLinkingToken
 	adminRecipients  map[int64]*models.AdminTelegramRecipient
+	clinicRecipients map[uuid.UUID][]models.ClinicTelegramRecipient
 }
 
 func (s *StubTelegramRepo) CreateLinkingToken(ctx context.Context, token *models.TelegramLinkingToken) error {
@@ -40,6 +43,9 @@ func (s *StubTelegramRepo) GetClinicRecipients(ctx context.Context, clinicID uui
 }
 
 func (s *StubTelegramRepo) GetActiveClinicRecipients(ctx context.Context, clinicID uuid.UUID) ([]models.ClinicTelegramRecipient, error) {
+	if s.clinicRecipients != nil {
+		return s.clinicRecipients[clinicID], nil
+	}
 	return nil, nil
 }
 
@@ -172,6 +178,8 @@ func (s *StubTelegramRepo) DeactivateAdminRecipientByChatID(ctx context.Context,
 
 type StubTelegramClient struct {
 	sentMessages int
+	lastText     string
+	lastMarkup   any
 }
 
 func (c *StubTelegramClient) GetMe(ctx context.Context) (*telegram.User, error) {
@@ -180,6 +188,8 @@ func (c *StubTelegramClient) GetMe(ctx context.Context) (*telegram.User, error) 
 
 func (c *StubTelegramClient) SendMessage(ctx context.Context, chatID int64, text string, replyMarkup any) (*telegram.Message, error) {
 	c.sentMessages++
+	c.lastText = text
+	c.lastMarkup = replyMarkup
 	return &telegram.Message{MessageID: 1, Chat: telegram.Chat{ID: chatID}, Text: text}, nil
 }
 
@@ -350,5 +360,166 @@ func TestAdminLinkingTokenFlow(t *testing.T) {
 
 	if svc.isAuthorizedAdmin(ctx, telegramUserID) {
 		t.Fatalf("expected telegram ID %d to NOT be authorized after disconnect", telegramUserID)
+	}
+}
+
+type StubOutboxRepo struct {
+	deliveredIDs []uuid.UUID
+}
+
+func (s *StubOutboxRepo) Enqueue(ctx context.Context, item *models.NotificationOutbox) error {
+	return nil
+}
+func (s *StubOutboxRepo) GetPending(ctx context.Context, limit int) ([]models.NotificationOutbox, error) {
+	return nil, nil
+}
+func (s *StubOutboxRepo) MarkDelivered(ctx context.Context, id uuid.UUID) error {
+	s.deliveredIDs = append(s.deliveredIDs, id)
+	return nil
+}
+func (s *StubOutboxRepo) MarkFailed(ctx context.Context, id uuid.UUID, lastError string, canRetry bool, nextRetryDelay time.Duration) error {
+	return nil
+}
+func (s *StubOutboxRepo) MarkSkipped(ctx context.Context, id uuid.UUID, reason string) error {
+	return nil
+}
+
+func TestTelegramService_DispatchDiagnosticOutboxNotifications(t *testing.T) {
+	ctx := context.Background()
+	clinicID := uuid.New()
+	chatID := int64(987654321)
+
+	stubRepo := &StubTelegramRepo{
+		clinicRecipients: map[uuid.UUID][]models.ClinicTelegramRecipient{
+			clinicID: {
+				{
+					ClinicID:       clinicID,
+					TelegramChatID: chatID,
+					IsActive:       true,
+				},
+			},
+		},
+	}
+	stubClient := &StubTelegramClient{}
+	stubOutbox := &StubOutboxRepo{}
+
+	cfg := &config.Config{
+		AppPublicURL: "https://qabulgo.uz",
+	}
+
+	svc := &telegramService{
+		cfg:             cfg,
+		telegramRepo:    stubRepo,
+		outboxRepo:      stubOutbox,
+		clinicBotClient: stubClient,
+	}
+
+	// 1. Test dispatch diagnostic_appointment_created
+	createdItem := &models.NotificationOutbox{
+		ID:             uuid.New(),
+		EventType:      "diagnostic_appointment_created",
+		TargetClinicID: &clinicID,
+		Payload: `{
+			"appointment_id": "11111111-2222-3333-4444-555555555555",
+			"clinic_name": "Shox Med Center",
+			"equipment_name": "Tesla MRI 3.0T",
+			"service_name": "MRT bosh miya",
+			"patient_name": "Alisher Usmonov",
+			"patient_phone": "+998901234567",
+			"date": "2026-12-01",
+			"start_time": "09:00",
+			"end_time": "09:30",
+			"price": 450000
+		}`,
+	}
+
+	err := svc.DispatchOutboxNotification(ctx, createdItem)
+	if err != nil {
+		t.Fatalf("DispatchOutboxNotification failed for created: %v", err)
+	}
+
+	if stubClient.sentMessages != 1 {
+		t.Fatalf("Expected 1 sent message, got %d", stubClient.sentMessages)
+	}
+
+	expectedCreatedSubstrings := []string{
+		"🩺 <b>Yangi Diagnostika Broni!</b>",
+		"🏥 <b>Klinika:</b> Shox Med Center",
+		"🔬 <b>Uskuna:</b> Tesla MRI 3.0T",
+		"📋 <b>Xizmat turi:</b> MRT bosh miya",
+		"👤 <b>Bemor:</b> Alisher Usmonov",
+		"📞 <b>Telefon:</b> +998901234567",
+		"📅 <b>Sana:</b> 2026-12-01",
+		"🕙 <b>Vaqt:</b> 09:00–09:30",
+		"💰 <b>Narxi:</b> 450000 so‘m",
+		"✅ <b>Holat:</b> Tasdiqlangan",
+	}
+
+	for _, sub := range expectedCreatedSubstrings {
+		if !strings.Contains(stubClient.lastText, sub) {
+			t.Errorf("Expected message to contain '%s', but got:\n%s", sub, stubClient.lastText)
+		}
+	}
+
+	if markup, ok := stubClient.lastMarkup.(*telegram.InlineKeyboardMarkup); ok {
+		if len(markup.InlineKeyboard) == 0 || len(markup.InlineKeyboard[0]) == 0 {
+			t.Errorf("Expected inline keyboard markup with button")
+		} else {
+			btn := markup.InlineKeyboard[0][0]
+			if !strings.Contains(btn.URL, "/clinic/diagnostics?tab=appointments") {
+				t.Errorf("Expected button URL to contain '/clinic/diagnostics?tab=appointments', got %s", btn.URL)
+			}
+		}
+	} else {
+		t.Errorf("Expected *telegram.InlineKeyboardMarkup, got %T", stubClient.lastMarkup)
+	}
+
+	if len(stubOutbox.deliveredIDs) != 1 || stubOutbox.deliveredIDs[0] != createdItem.ID {
+		t.Errorf("Expected item to be marked delivered, got deliveredIDs: %v", stubOutbox.deliveredIDs)
+	}
+
+	// 2. Test dispatch diagnostic_appointment_cancelled
+	cancelledItem := &models.NotificationOutbox{
+		ID:             uuid.New(),
+		EventType:      "diagnostic_appointment_cancelled",
+		TargetClinicID: &clinicID,
+		Payload: `{
+			"appointment_id": "11111111-2222-3333-4444-555555555555",
+			"clinic_name": "Shox Med Center",
+			"equipment_name": "Tesla MRI 3.0T",
+			"service_name": "MRT bosh miya",
+			"patient_name": "Alisher Usmonov",
+			"date": "2026-12-01",
+			"start_time": "09:00",
+			"end_time": "09:30",
+			"cancelled_by": "Bemor",
+			"reason": "Vaqtim to'g'ri kelmadi"
+		}`,
+	}
+
+	err = svc.DispatchOutboxNotification(ctx, cancelledItem)
+	if err != nil {
+		t.Fatalf("DispatchOutboxNotification failed for cancelled: %v", err)
+	}
+
+	if stubClient.sentMessages != 2 {
+		t.Fatalf("Expected 2 sent messages, got %d", stubClient.sentMessages)
+	}
+
+	expectedCancelledSubstrings := []string{
+		"❌ <b>DIAGNOSTIKA BRONI BEKOR QILINDI</b>",
+		"🏥 <b>Klinika:</b> Shox Med Center",
+		"🔬 <b>Uskuna:</b> Tesla MRI 3.0T",
+		"📋 <b>Xizmat:</b> MRT bosh miya",
+		"👤 <b>Bemor:</b> Alisher Usmonov",
+		"⚠️ <b>Bekor qilgan:</b> Bemor",
+		"📝 <b>Sabab:</b> Vaqtim to'g'ri kelmadi",
+		"🔴 <b>Holat:</b> Bekor qilingan",
+	}
+
+	for _, sub := range expectedCancelledSubstrings {
+		if !strings.Contains(stubClient.lastText, sub) {
+			t.Errorf("Expected cancelled message to contain '%s', but got:\n%s", sub, stubClient.lastText)
+		}
 	}
 }

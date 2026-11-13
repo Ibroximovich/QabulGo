@@ -2,10 +2,13 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +27,7 @@ var (
 	ErrSlotNotInEquipmentSchedule    = errors.New("tanlangan vaqt uskunaning ish jadvalida mavjud emas")
 	ErrDiagPrematureCompletion       = errors.New("qabul vaqti hali kelmagan, qabulni faqat boshlanish vaqtidan so‘ng yakunlash mumkin")
 	ErrDiagPrematureNoShow           = errors.New("qabul vaqti hali kelmagan, bemor kelmaganligini faqat qabul vaqtidan so‘ng belgilash mumkin")
+	ErrUnauthorizedEquipmentAccess   = errors.New("ushbu klinikani boshqarish huquqiga ega emassiz")
 )
 
 var (
@@ -47,6 +51,7 @@ type DiagnosticService interface {
 	UpdateService(ctx context.Context, clinicID, userID, serviceID uuid.UUID, req *dto.UpdateDiagnosticServiceRequest) (*dto.DiagnosticServiceDTO, error)
 	GetService(ctx context.Context, serviceID uuid.UUID) (*dto.DiagnosticServiceDTO, error)
 	ListServicesByClinic(ctx context.Context, clinicID uuid.UUID, categoryID *uuid.UUID) (*dto.ListDiagnosticServicesResponse, error)
+	ListPublicServices(ctx context.Context, clinicID *uuid.UUID, categoryID *uuid.UUID) (*dto.ListDiagnosticServicesResponse, error)
 	DeleteService(ctx context.Context, clinicID, userID, serviceID uuid.UUID) error
 
 	// Equipment Schedule & Slots
@@ -95,7 +100,7 @@ func NewDiagnosticService(
 func (s *diagnosticService) checkClinicPermission(ctx context.Context, clinicID, userID uuid.UUID) error {
 	isAdmin, err := s.clinicRepo.IsUserClinicAdmin(ctx, clinicID, userID)
 	if err != nil || !isAdmin {
-		return errors.New("ushbu klinikani boshqarish huquqiga ega emassiz")
+		return ErrUnauthorizedEquipmentAccess
 	}
 	return nil
 }
@@ -414,6 +419,16 @@ func (s *diagnosticService) GetService(ctx context.Context, serviceID uuid.UUID)
 			UpdatedAt:  svc.Equipment.UpdatedAt,
 		}
 	}
+	if svc.Clinic != nil {
+		res.Clinic = &dto.DiagnosticClinicInfoDTO{
+			ID:       svc.Clinic.ID,
+			Name:     svc.Clinic.Name,
+			Address:  svc.Clinic.Address,
+			Region:   svc.Clinic.Region,
+			District: svc.Clinic.District,
+			Phone:    svc.Clinic.Phone,
+		}
+	}
 	return res, nil
 }
 
@@ -422,6 +437,18 @@ func (s *diagnosticService) ListServicesByClinic(ctx context.Context, clinicID u
 	if err != nil {
 		return nil, err
 	}
+	return mapServiceListToDTO(list), nil
+}
+
+func (s *diagnosticService) ListPublicServices(ctx context.Context, clinicID *uuid.UUID, categoryID *uuid.UUID) (*dto.ListDiagnosticServicesResponse, error) {
+	list, err := s.diagRepo.ListPublicServices(ctx, clinicID, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	return mapServiceListToDTO(list), nil
+}
+
+func mapServiceListToDTO(list []models.DiagnosticService) *dto.ListDiagnosticServicesResponse {
 	res := make([]dto.DiagnosticServiceDTO, len(list))
 	for i, svc := range list {
 		res[i] = dto.DiagnosticServiceDTO{
@@ -458,11 +485,21 @@ func (s *diagnosticService) ListServicesByClinic(ctx context.Context, clinicID u
 				UpdatedAt:  svc.Equipment.UpdatedAt,
 			}
 		}
+		if svc.Clinic != nil {
+			res[i].Clinic = &dto.DiagnosticClinicInfoDTO{
+				ID:       svc.Clinic.ID,
+				Name:     svc.Clinic.Name,
+				Address:  svc.Clinic.Address,
+				Region:   svc.Clinic.Region,
+				District: svc.Clinic.District,
+				Phone:    svc.Clinic.Phone,
+			}
+		}
 	}
 	return &dto.ListDiagnosticServicesResponse{
 		Services: res,
 		Total:    len(res),
-	}, nil
+	}
 }
 
 func (s *diagnosticService) DeleteService(ctx context.Context, clinicID, userID, serviceID uuid.UUID) error {
@@ -645,16 +682,39 @@ func (s *diagnosticService) DeleteEquipmentDateOverride(ctx context.Context, cli
 	return s.diagRepo.DeleteDateOverride(ctx, equipmentID, overrideID)
 }
 
+// Helpers for diagnostic slot time parsing & formatting
+func parseDiagTimeToMinutes(t string) (int, error) {
+	t = strings.TrimSpace(t)
+	parts := strings.Split(t, ":")
+	if len(parts) != 2 {
+		return 0, ErrInvalidTimeFormat
+	}
+	h, err1 := strconv.Atoi(parts[0])
+	m, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil || h < 0 || h > 23 || m < 0 || m > 59 {
+		return 0, ErrInvalidTimeFormat
+	}
+	return h*60 + m, nil
+}
+
+func formatDiagMinutesToTime(mins int) string {
+	h := mins / 60
+	m := mins % 60
+	return fmt.Sprintf("%02d:%02d", h, m)
+}
+
 // GetDiagnosticEquipmentAvailability calculates free available slots for an equipment on a target date
 func (s *diagnosticService) GetDiagnosticEquipmentAvailability(
 	ctx context.Context,
 	equipmentID uuid.UUID,
 	dateStr string,
 ) (*dto.DiagnosticAvailabilityResponse, error) {
+	dateStr = strings.TrimSpace(dateStr)
 	if !diagDateRegex.MatchString(dateStr) {
 		return nil, ErrInvalidDateFormat
 	}
-	targetDate, err := time.Parse("2006-01-02", dateStr)
+	tashkentLoc := getTashkentLocation()
+	targetDate, err := time.ParseInLocation("2006-01-02", dateStr, tashkentLoc)
 	if err != nil {
 		return nil, ErrInvalidDateFormat
 	}
@@ -676,7 +736,6 @@ func (s *diagnosticService) GetDiagnosticEquipmentAvailability(
 		return nil, ErrClinicNotApproved
 	}
 
-	tashkentLoc := getTashkentLocation()
 	nowTashkent := time.Now().In(tashkentLoc)
 	todayTashkentStr := nowTashkent.Format("2006-01-02")
 	currentTimeStr := nowTashkent.Format("15:04")
@@ -701,54 +760,86 @@ func (s *diagnosticService) GetDiagnosticEquipmentAvailability(
 		}
 	}
 
-	// Candidate slots from weekly schedule
+	// Candidate slots from weekly schedule & available overrides
 	type slotEntry struct {
 		start string
 		end   string
 	}
-	var candidateSlots []slotEntry
+	var rawCandidates []slotEntry
 
 	for _, ws := range weeklySlots {
-		if ws.Status != models.SlotStatusActive {
+		if ws.Status == models.SlotStatusInactive {
 			continue
 		}
-		isClosed := false
-		for _, o := range dateOverrides {
-			if o.Status == models.OverrideStatusClosed && o.StartTime != nil && o.EndTime != nil {
-				if ws.StartTime < *o.EndTime && *o.StartTime < ws.EndTime {
-					isClosed = true
-					break
-				}
-			}
-		}
-		if !isClosed {
-			candidateSlots = append(candidateSlots, slotEntry{
-				start: ws.StartTime,
-				end:   ws.EndTime,
-			})
-		}
+		rawCandidates = append(rawCandidates, slotEntry{
+			start: strings.TrimSpace(ws.StartTime),
+			end:   strings.TrimSpace(ws.EndTime),
+		})
 	}
 
 	// Add available overrides
 	for _, o := range dateOverrides {
 		if o.Status == models.OverrideStatusAvailable && o.StartTime != nil && o.EndTime != nil {
-			candidateSlots = append(candidateSlots, slotEntry{
-				start: *o.StartTime,
-				end:   *o.EndTime,
+			rawCandidates = append(rawCandidates, slotEntry{
+				start: strings.TrimSpace(*o.StartTime),
+				end:   strings.TrimSpace(*o.EndTime),
 			})
 		}
 	}
 
-	// Filter booked appointments
+	// Chunk any windows longer than 30 minutes into 30-minute discrete bookable slots
+	var candidateSlots []slotEntry
+	for _, raw := range rawCandidates {
+		sMins, err1 := parseDiagTimeToMinutes(raw.start)
+		eMins, err2 := parseDiagTimeToMinutes(raw.end)
+		if err1 != nil || err2 != nil || eMins <= sMins {
+			continue
+		}
+		if eMins-sMins > 30 {
+			for m := sMins; m+30 <= eMins; m += 30 {
+				candidateSlots = append(candidateSlots, slotEntry{
+					start: formatDiagMinutesToTime(m),
+					end:   formatDiagMinutesToTime(m + 30),
+				})
+			}
+		} else {
+			candidateSlots = append(candidateSlots, slotEntry{
+				start: formatDiagMinutesToTime(sMins),
+				end:   formatDiagMinutesToTime(eMins),
+			})
+		}
+	}
+
+	// Filter booked appointments and closed overrides
 	bookedAppts, err := s.diagRepo.GetBookedSlotsForEquipment(ctx, equipmentID, dateStr)
 	if err != nil {
 		return nil, err
 	}
 
 	var availableSlots []dto.DiagnosticAvailabilitySlotDTO
+	seenSlots := make(map[string]bool)
+
 	for _, cand := range candidateSlots {
+		if seenSlots[cand.start] {
+			continue
+		}
+
 		// Past time slots on today's date
 		if dateStr == todayTashkentStr && cand.start <= currentTimeStr {
+			continue
+		}
+
+		// Check if covered by a closed override
+		isClosed := false
+		for _, o := range dateOverrides {
+			if o.Status == models.OverrideStatusClosed && o.StartTime != nil && o.EndTime != nil {
+				if cand.start < *o.EndTime && *o.StartTime < cand.end {
+					isClosed = true
+					break
+				}
+			}
+		}
+		if isClosed {
 			continue
 		}
 
@@ -761,6 +852,7 @@ func (s *diagnosticService) GetDiagnosticEquipmentAvailability(
 		}
 
 		if !isBooked {
+			seenSlots[cand.start] = true
 			availableSlots = append(availableSlots, dto.DiagnosticAvailabilitySlotDTO{
 				StartTime: cand.start,
 				EndTime:   cand.end,
@@ -943,6 +1035,7 @@ func (s *diagnosticService) BookDiagnosticAppointment(
 
 	// 10. Create Appointment inside Transaction with Row Locking
 	appt := &models.DiagnosticAppointment{
+		ID:                      uuid.New(),
 		PatientID:               patientID,
 		ClinicID:                req.ClinicID,
 		ServiceID:               req.ServiceID,
@@ -960,11 +1053,104 @@ func (s *diagnosticService) BookDiagnosticAppointment(
 		return nil, err
 	}
 
-	fullAppt, err := s.diagRepo.GetAppointmentByID(ctx, appt.ID)
-	if err != nil {
-		return mapDiagAppointmentToDTO(appt), nil
+	// 10.1 Audit log
+	if s.auditRepo != nil {
+		_ = s.auditRepo.CreateAuditLog(ctx, &models.AuditLog{
+			UserID:     &patientID,
+			Action:     "BOOK_DIAGNOSTIC_APPOINTMENT",
+			EntityType: "diagnostic_appointments",
+			EntityID:   &appt.ID,
+			Details:    fmt.Sprintf(`{"clinic_id":"%s","equipment_id":"%s","service_id":"%s","date":"%s","start_time":"%s"}`, req.ClinicID, req.EquipmentID, req.ServiceID, req.Date, req.StartTime),
+		})
 	}
-	return mapDiagAppointmentToDTO(fullAppt), nil
+
+	targetAppt := appt
+	fullAppt, err := s.diagRepo.GetAppointmentByID(ctx, appt.ID)
+	if err == nil && fullAppt != nil {
+		targetAppt = fullAppt
+	} else if err != nil {
+		log.Printf("[DiagnosticService] GetAppointmentByID ogohlantirish (ID: %s): %v\n", appt.ID, err)
+	}
+
+	// 11. Enqueue Outbox Notification for Clinic Telegram Bot
+	if s.outboxRepo != nil {
+		clinicName := ""
+		if targetAppt.Clinic != nil && strings.TrimSpace(targetAppt.Clinic.Name) != "" {
+			clinicName = targetAppt.Clinic.Name
+		} else if clinic != nil {
+			clinicName = clinic.Name
+		}
+		patientName := "Bemor"
+		patientPhone := ""
+		if targetAppt.Patient != nil {
+			patientName = strings.TrimSpace(fmt.Sprintf("%s %s", targetAppt.Patient.FirstName, targetAppt.Patient.LastName))
+			if patientName == "" {
+				patientName = "Bemor"
+			}
+			patientPhone = targetAppt.Patient.Phone
+		}
+		equipmentName := ""
+		if targetAppt.Equipment != nil && strings.TrimSpace(targetAppt.Equipment.Name) != "" {
+			equipmentName = targetAppt.Equipment.Name
+		} else if eq != nil {
+			equipmentName = eq.Name
+		}
+		serviceName := ""
+		serviceCategory := ""
+		if targetAppt.Service != nil {
+			if strings.TrimSpace(targetAppt.Service.Name) != "" {
+				serviceName = targetAppt.Service.Name
+			}
+			if targetAppt.Service.Category != nil {
+				serviceCategory = targetAppt.Service.Category.Name
+			}
+		}
+		if serviceName == "" && svc != nil {
+			serviceName = svc.Name
+			if svc.Category != nil {
+				serviceCategory = svc.Category.Name
+			}
+		}
+
+		payloadBytes, err := json.Marshal(map[string]any{
+			"appointment_id":   targetAppt.ID.String(),
+			"clinic_id":        targetAppt.ClinicID.String(),
+			"clinic_name":      clinicName,
+			"equipment_name":   equipmentName,
+			"service_name":     serviceName,
+			"service_category": serviceCategory,
+			"patient_name":     patientName,
+			"patient_phone":    patientPhone,
+			"date":             targetAppt.AppointmentDate,
+			"start_time":       targetAppt.StartTime,
+			"end_time":         targetAppt.EndTime,
+			"price":            targetAppt.Price,
+		})
+		if err != nil {
+			log.Printf("[DiagnosticService] Payload json.Marshal xatoligi (ApptID: %s): %v\n", targetAppt.ID, err)
+		} else {
+			outboxItem := &models.NotificationOutbox{
+				ID:             uuid.New(),
+				EventType:      "diagnostic_appointment_created",
+				EntityType:     "diagnostic_appointment",
+				EntityID:       targetAppt.ID,
+				TargetClinicID: &targetAppt.ClinicID,
+				TargetRole:     "clinic",
+				Payload:        string(payloadBytes),
+				Status:         "pending",
+			}
+
+			if err := s.outboxRepo.Enqueue(ctx, outboxItem); err != nil {
+				log.Printf("[DiagnosticService] Outbox notification enqueue xatoligi (ID: %s, ClinicID: %s): %v\n", targetAppt.ID, targetAppt.ClinicID, err)
+			} else {
+				log.Printf("[DiagnosticService] Yangi diagnostika broni outbox ga muvaffaqiyatli saqlandi (ApptID: %s, ClinicID: %s)\n", targetAppt.ID, targetAppt.ClinicID)
+			}
+		}
+	} else {
+		log.Printf("[DiagnosticService] s.outboxRepo nil bo'lgani uchun Telegram xabarnomasi navbatga qo'yilmadi (ApptID: %s)\n", targetAppt.ID)
+	}
+
+	return mapDiagAppointmentToDTO(targetAppt), nil
 }
 
 func (s *diagnosticService) GetPatientDiagnosticAppointments(
@@ -1057,6 +1243,66 @@ func (s *diagnosticService) CancelPatientDiagnosticAppointment(
 	if err != nil {
 		return nil, err
 	}
+
+	if s.outboxRepo != nil {
+		clinicName := ""
+		if updated.Clinic != nil {
+			clinicName = updated.Clinic.Name
+		}
+		patientName := "Bemor"
+		patientPhone := ""
+		if updated.Patient != nil {
+			patientName = strings.TrimSpace(fmt.Sprintf("%s %s", updated.Patient.FirstName, updated.Patient.LastName))
+			if patientName == "" {
+				patientName = "Bemor"
+			}
+			patientPhone = updated.Patient.Phone
+		}
+		equipmentName := ""
+		if updated.Equipment != nil {
+			equipmentName = updated.Equipment.Name
+		}
+		serviceName := ""
+		if updated.Service != nil {
+			serviceName = updated.Service.Name
+		}
+		reasonStr := "Bemor tomonidan bekor qilindi"
+		if reasonPtr != nil && *reasonPtr != "" {
+			reasonStr = *reasonPtr
+		}
+
+		payloadBytes, _ := json.Marshal(map[string]any{
+			"appointment_id": updated.ID.String(),
+			"clinic_id":      updated.ClinicID.String(),
+			"clinic_name":    clinicName,
+			"equipment_name": equipmentName,
+			"service_name":   serviceName,
+			"patient_name":   patientName,
+			"patient_phone":  patientPhone,
+			"date":           updated.AppointmentDate,
+			"start_time":     updated.StartTime,
+			"end_time":       updated.EndTime,
+			"cancelled_by":   "Bemor",
+			"reason":         reasonStr,
+		})
+
+		outboxItem := &models.NotificationOutbox{
+			ID:             uuid.New(),
+			EventType:      "diagnostic_appointment_cancelled",
+			EntityType:     "diagnostic_appointment",
+			EntityID:       updated.ID,
+			TargetClinicID: &updated.ClinicID,
+			TargetRole:     "clinic",
+			Payload:        string(payloadBytes),
+			Status:         "pending",
+		}
+		if err := s.outboxRepo.Enqueue(ctx, outboxItem); err != nil {
+			log.Printf("[DiagnosticService] Outbox cancellation enqueue xatoligi (ID: %s, ClinicID: %s): %v\n", updated.ID, updated.ClinicID, err)
+		} else {
+			log.Printf("[DiagnosticService] Diagnostika broni bekor qilingani outbox ga saqlandi (ApptID: %s, ClinicID: %s)\n", updated.ID, updated.ClinicID)
+		}
+	}
+
 	return mapDiagAppointmentToDTO(updated), nil
 }
 
@@ -1134,6 +1380,66 @@ func (s *diagnosticService) CancelClinicDiagnosticAppointment(
 	if err != nil {
 		return nil, err
 	}
+
+	if s.outboxRepo != nil {
+		clinicName := ""
+		if updated.Clinic != nil {
+			clinicName = updated.Clinic.Name
+		}
+		patientName := "Bemor"
+		patientPhone := ""
+		if updated.Patient != nil {
+			patientName = strings.TrimSpace(fmt.Sprintf("%s %s", updated.Patient.FirstName, updated.Patient.LastName))
+			if patientName == "" {
+				patientName = "Bemor"
+			}
+			patientPhone = updated.Patient.Phone
+		}
+		equipmentName := ""
+		if updated.Equipment != nil {
+			equipmentName = updated.Equipment.Name
+		}
+		serviceName := ""
+		if updated.Service != nil {
+			serviceName = updated.Service.Name
+		}
+		reasonStr := "Klinika ma'muriyati tomonidan bekor qilindi"
+		if reasonPtr != nil && *reasonPtr != "" {
+			reasonStr = *reasonPtr
+		}
+
+		payloadBytes, _ := json.Marshal(map[string]any{
+			"appointment_id": updated.ID.String(),
+			"clinic_id":      updated.ClinicID.String(),
+			"clinic_name":    clinicName,
+			"equipment_name": equipmentName,
+			"service_name":   serviceName,
+			"patient_name":   patientName,
+			"patient_phone":  patientPhone,
+			"date":           updated.AppointmentDate,
+			"start_time":     updated.StartTime,
+			"end_time":       updated.EndTime,
+			"cancelled_by":   "Klinika ma'muriyati",
+			"reason":         reasonStr,
+		})
+
+		outboxItem := &models.NotificationOutbox{
+			ID:             uuid.New(),
+			EventType:      "diagnostic_appointment_cancelled",
+			EntityType:     "diagnostic_appointment",
+			EntityID:       updated.ID,
+			TargetClinicID: &updated.ClinicID,
+			TargetRole:     "clinic",
+			Payload:        string(payloadBytes),
+			Status:         "pending",
+		}
+		if err := s.outboxRepo.Enqueue(ctx, outboxItem); err != nil {
+			log.Printf("[DiagnosticService] Outbox cancellation enqueue xatoligi (ID: %s, ClinicID: %s): %v\n", updated.ID, updated.ClinicID, err)
+		} else {
+			log.Printf("[DiagnosticService] Diagnostika broni bekor qilingani outbox ga saqlandi (ApptID: %s, ClinicID: %s)\n", updated.ID, updated.ClinicID)
+		}
+	}
+
 	return mapDiagAppointmentToDTO(updated), nil
 }
 
@@ -1170,6 +1476,7 @@ func (s *diagnosticService) CompleteClinicDiagnosticAppointment(
 	if err != nil {
 		return nil, err
 	}
+
 	return mapDiagAppointmentToDTO(updated), nil
 }
 
@@ -1206,6 +1513,7 @@ func (s *diagnosticService) NoShowClinicDiagnosticAppointment(
 	if err != nil {
 		return nil, err
 	}
+
 	return mapDiagAppointmentToDTO(updated), nil
 }
 

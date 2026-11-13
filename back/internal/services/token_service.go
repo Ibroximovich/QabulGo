@@ -43,8 +43,21 @@ func NewTokenService(cfg *config.Config, sessionRepo repositories.RefreshSession
 const PatientAndClinicSessionTTL = 30 * 24 * time.Hour
 
 func (s *tokenService) GenerateTokenPair(ctx context.Context, userID uuid.UUID, role string) (string, string, time.Time, error) {
-	// Access Token yaratish (15 daqiqa)
-	accessToken, err := utils.GenerateAccessToken(userID, role, s.cfg.AccessTokenTTL, s.cfg.JWTSecret, s.cfg.JWTIssuer, s.cfg.JWTAudience)
+	now := time.Now().UTC()
+
+	var sessionTTL time.Duration
+	var accessTTL time.Duration
+	if role == string(models.RolePatient) || role == string(models.RoleClinicOwner) || role == string(models.RoleClinicAdmin) || role == string(models.RoleDoctor) {
+		sessionTTL = PatientAndClinicSessionTTL // Bemor, klinika va shifokor uchun 30 kunlik sessiya
+		accessTTL = PatientAndClinicSessionTTL  // 30 kunlik token
+	} else {
+		// SuperAdmin uchun standart konfiguratsiyadagi TTL (7 kun refresh, 15 min access) saqlanadi
+		sessionTTL = s.cfg.RefreshTokenTTL
+		accessTTL = s.cfg.AccessTokenTTL
+	}
+
+	// Access Token yaratish
+	accessToken, err := utils.GenerateAccessToken(userID, role, accessTTL, s.cfg.JWTSecret, s.cfg.JWTIssuer, s.cfg.JWTAudience)
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
@@ -56,15 +69,6 @@ func (s *tokenService) GenerateTokenPair(ctx context.Context, userID uuid.UUID, 
 	}
 
 	tokenHash := utils.HashToken(rawRefreshToken)
-	now := time.Now().UTC()
-
-	var sessionTTL time.Duration
-	if role == string(models.RolePatient) || role == string(models.RoleClinicOwner) || role == string(models.RoleClinicAdmin) {
-		sessionTTL = PatientAndClinicSessionTTL // Bemor va klinika uchun 30 kunlik sessiya
-	} else {
-		// SuperAdmin uchun standart konfiguratsiyadagi TTL (7 kun) o'zgarmasdan saqlanadi
-		sessionTTL = s.cfg.RefreshTokenTTL
-	}
 
 	maxExpiresAt := now.Add(sessionTTL)
 	expiresAt := maxExpiresAt
@@ -125,12 +129,6 @@ func (s *tokenService) RotateRefreshToken(ctx context.Context, rawRefreshToken s
 		return "", "", time.Time{}, err
 	}
 
-	// Yangi Access Token yaratish
-	accessToken, err := utils.GenerateAccessToken(user.ID, string(user.Role), s.cfg.AccessTokenTTL, s.cfg.JWTSecret, s.cfg.JWTIssuer, s.cfg.JWTAudience)
-	if err != nil {
-		return "", "", time.Time{}, err
-	}
-
 	// Yangi Refresh Token yaratish
 	newRawRefreshToken, err := utils.GenerateRandomToken(32)
 	if err != nil {
@@ -140,19 +138,28 @@ func (s *tokenService) RotateRefreshToken(ctx context.Context, rawRefreshToken s
 	newTokenHash := utils.HashToken(newRawRefreshToken)
 
 	// Yangi sessiyaning amal qilish muddati:
-	// Bemor va klinika akkauntlari uchun dastlabki logindan hisoblangan mutlaq 30 kunlik chegara (maxExpiresAt) saqlanadi
+	// Bemor, klinika va shifokor akkauntlari uchun dastlabki logindan hisoblangan mutlaq 30 kunlik chegara (maxExpiresAt) saqlanadi
 	// 30 kundan ortiq uzaytirilmaydi!
 	// SuperAdmin uchun standart RefreshTokenTTL saqlanadi
+	var accessTTL time.Duration
 	var newExpiresAt time.Time
 	var newMaxExpiresAt time.Time
 
-	if user.Role == models.RolePatient || user.Role == models.RoleClinicOwner || user.Role == models.RoleClinicAdmin {
+	if user.Role == models.RolePatient || user.Role == models.RoleClinicOwner || user.Role == models.RoleClinicAdmin || user.Role == models.RoleDoctor {
+		accessTTL = PatientAndClinicSessionTTL
 		newMaxExpiresAt = maxExpiresAt // Dastlabki logindagi mutlaq 30 kunlik sana uzaytirilmaydi
 		newExpiresAt = maxExpiresAt
 	} else {
 		// Superadmin
+		accessTTL = s.cfg.AccessTokenTTL
 		newExpiresAt = now.Add(s.cfg.RefreshTokenTTL)
 		newMaxExpiresAt = newExpiresAt
+	}
+
+	// Yangi Access Token yaratish
+	accessToken, err := utils.GenerateAccessToken(user.ID, string(user.Role), accessTTL, s.cfg.JWTSecret, s.cfg.JWTIssuer, s.cfg.JWTAudience)
+	if err != nil {
+		return "", "", time.Time{}, err
 	}
 
 	newSession := &models.RefreshSession{

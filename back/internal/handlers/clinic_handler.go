@@ -197,11 +197,22 @@ func (h *ClinicHandler) SubmitClinic(c *gin.Context) {
 		return
 	}
 
+	var clinicID uuid.UUID
 	idStr := c.Param("id")
-	clinicID, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("Klinika ID formati noto‘g‘ri", nil))
-		return
+	if idStr == "" || idStr == "mine" {
+		myClinic, err := h.clinicService.GetMyClinic(c.Request.Context(), userID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, dto.NewErrorResponse("Klinika topilmadi", nil))
+			return
+		}
+		clinicID = myClinic.ID
+	} else {
+		parsed, err := uuid.Parse(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, dto.NewErrorResponse("Klinika ID formati noto‘g‘ri", nil))
+			return
+		}
+		clinicID = parsed
 	}
 
 	submitted, err := h.clinicService.SubmitClinic(c.Request.Context(), clinicID, userID)

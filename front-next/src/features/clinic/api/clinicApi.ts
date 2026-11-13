@@ -65,8 +65,11 @@ export const clinicApi = {
     return apiClient.patch<ApiResponse<ClinicDetail>>(`/clinics/${id}`, payload);
   },
 
-  submitClinic(id: string) {
-    return apiClient.post<ApiResponse<{ status: string }>>(`/clinics/${id}/submit`);
+  submitClinic(id?: string) {
+    if (id && id !== 'mine') {
+      return apiClient.post<ApiResponse<ClinicDetail>>(`/clinics/${id}/submit`, {});
+    }
+    return apiClient.post<ApiResponse<ClinicDetail>>('/clinics/submit', {});
   },
 
   // Specialties

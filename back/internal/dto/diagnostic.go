@@ -83,6 +83,7 @@ type DiagnosticServiceDTO struct {
 	EquipmentID      uuid.UUID               `json:"equipment_id"`
 	Category         *DiagnosticCategoryDTO  `json:"category,omitempty"`
 	Equipment        *DiagnosticEquipmentDTO `json:"equipment,omitempty"`
+	Clinic           *DiagnosticClinicInfoDTO `json:"clinic,omitempty"`
 	Name             string                  `json:"name"`
 	Price            float64                 `json:"price"`
 	DurationMinutes  int                     `json:"duration_minutes"`
@@ -90,6 +91,15 @@ type DiagnosticServiceDTO struct {
 	IsActive         bool                    `json:"is_active"`
 	CreatedAt        time.Time               `json:"created_at"`
 	UpdatedAt        time.Time               `json:"updated_at"`
+}
+
+type DiagnosticClinicInfoDTO struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Address  string    `json:"address"`
+	Region   string    `json:"region"`
+	District string    `json:"district"`
+	Phone    string    `json:"phone,omitempty"`
 }
 
 type ListDiagnosticServicesResponse struct {
@@ -215,3 +225,4 @@ type DiagnosticAppointmentListResponseDTO struct {
 	Page         int                                `json:"page"`
 	Limit        int                                `json:"limit"`
 }
+

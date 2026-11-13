@@ -238,10 +238,17 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 		return nil, "", time.Time{}, err
 	}
 
+	var expiresIn int64
+	if user.Role == models.RoleSuperAdmin {
+		expiresIn = int64(s.cfg.AccessTokenTTL.Seconds())
+	} else {
+		expiresIn = int64((30 * 24 * time.Hour).Seconds())
+	}
+
 	loginData := &dto.LoginData{
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
-		ExpiresIn:   int64(s.cfg.AccessTokenTTL.Seconds()),
+		ExpiresIn:   expiresIn,
 		User: dto.UserSummary{
 			ID:        user.ID,
 			FirstName: user.FirstName,
@@ -355,10 +362,17 @@ func (s *authService) loginWithRoles(ctx context.Context, emailRaw, password str
 		return nil, "", time.Time{}, err
 	}
 
+	var expiresIn int64
+	if user.Role == models.RoleSuperAdmin {
+		expiresIn = int64(s.cfg.AccessTokenTTL.Seconds())
+	} else {
+		expiresIn = int64((30 * 24 * time.Hour).Seconds())
+	}
+
 	loginData := &dto.LoginData{
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
-		ExpiresIn:   int64(s.cfg.AccessTokenTTL.Seconds()),
+		ExpiresIn:   expiresIn,
 		User: dto.UserSummary{
 			ID:        user.ID,
 			FirstName: user.FirstName,

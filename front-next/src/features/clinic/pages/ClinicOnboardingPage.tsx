@@ -114,14 +114,27 @@ export function ClinicOnboardingPage() {
   // Save draft mutation
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
+      let activeClinicId = clinicId || existingClinicRes?.id;
+      if (!activeClinicId) {
+        try {
+          const myClinic = await clinicApi.getMyClinic();
+          if (myClinic.data?.data?.id) {
+            activeClinicId = myClinic.data.data.id;
+            setClinicId(activeClinicId);
+          }
+        } catch {
+          // Clinic doesn't exist yet
+        }
+      }
+
       const payload: CreateClinicPayload = {
-        name,
-        phone,
-        email: email || undefined,
-        description: description || undefined,
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        description: description.trim() || undefined,
         region: region || 'Toshkent shahri',
         district: district || 'Yunusobod',
-        address: address || 'Kiritilmagan',
+        address: address.trim() || 'Kiritilmagan',
         location_url: locationUrl.trim() || undefined,
         latitude: latitude !== null ? latitude : undefined,
         longitude: longitude !== null ? longitude : undefined,
@@ -130,8 +143,8 @@ export function ClinicOnboardingPage() {
         working_hours: workingHours,
       };
 
-      if (clinicId) {
-        const res = await clinicApi.updateClinic(clinicId, payload);
+      if (activeClinicId) {
+        const res = await clinicApi.updateClinic(activeClinicId, payload);
         return res.data?.data;
       } else {
         const res = await clinicApi.createClinic(payload);
@@ -149,22 +162,68 @@ export function ClinicOnboardingPage() {
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const saved = await saveDraftMutation.mutateAsync();
-      const targetId = saved?.id || clinicId;
-      if (!targetId) throw new Error('Klinika ID topilmadi');
-      const res = await clinicApi.submitClinic(targetId);
+      if (!name.trim() || name.length < 2) {
+        throw new Error('Klinika nomi kamida 2 ta belgidan iborat bo‘lishi kerak');
+      }
+      if (!region || !district || !address.trim() || address.length < 5) {
+        throw new Error('Klinika manzili to‘liq kiritilishi shart (viloyat, tuman, manzil)');
+      }
+
+      let activeClinicId = clinicId || existingClinicRes?.id;
+      if (!activeClinicId) {
+        try {
+          const myClinic = await clinicApi.getMyClinic();
+          if (myClinic.data?.data?.id) {
+            activeClinicId = myClinic.data.data.id;
+            setClinicId(activeClinicId);
+          }
+        } catch {
+          // Yangi yaratish lozim
+        }
+      }
+
+      const payload: CreateClinicPayload = {
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        description: description.trim() || undefined,
+        region: region || 'Toshkent shahri',
+        district: district || 'Yunusobod',
+        address: address.trim() || 'Kiritilmagan',
+        location_url: locationUrl.trim() || undefined,
+        latitude: latitude !== null ? latitude : undefined,
+        longitude: longitude !== null ? longitude : undefined,
+        logo_url: logoUrl || undefined,
+        cover_image_url: coverImageUrl || undefined,
+        working_hours: workingHours,
+      };
+
+      if (activeClinicId) {
+        await clinicApi.updateClinic(activeClinicId, payload);
+      } else {
+        const createRes = await clinicApi.createClinic(payload);
+        activeClinicId = createRes.data?.data?.id;
+        if (activeClinicId) {
+          setClinicId(activeClinicId);
+        }
+      }
+
+      const res = await clinicApi.submitClinic(activeClinicId);
       return res.data;
     },
     onSuccess: () => {
       toast.success('Klinikangiz tasdiqlash uchun superadminga yuborildi!');
       queryClient.invalidateQueries({ queryKey: ['myClinic'] });
+      queryClient.invalidateQueries({ queryKey: ['myClinicOnboarding'] });
       router.replace('/clinic/dashboard');
     },
     onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast.error(
-        axiosErr.response?.data?.message || 'Arizani yuborishda xatolik yuz berdi'
-      );
+      const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage =
+        axiosErr.response?.data?.message ||
+        axiosErr.message ||
+        'Arizani yuborishda xatolik yuz berdi';
+      toast.error(errorMessage);
     },
   });
 
