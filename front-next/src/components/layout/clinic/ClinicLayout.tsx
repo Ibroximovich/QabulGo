@@ -252,10 +252,10 @@ export function ClinicLayout({ children }: ClinicLayoutProps) {
                   Savollaringiz bo‘yicha QabulGo qo‘llab-quvvatlash xizmati doimo aloqada:
                 </p>
                 <a
-                  href="tel:+998712000000"
+                  href="tel:+998971921415"
                   className="font-semibold text-[#0866F5] hover:underline block"
                 >
-                  +998 (71) 200-00-00
+                  +998 (97) 192-14-15
                 </a>
               </div>
             )}
